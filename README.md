@@ -8,3 +8,6 @@ https://www.figma.com/design/yJ7AT0QH2rLCQzPgSs9S4y/Usuario_Enfermeras?node-id=0
 
 FIGMA_PROTOTIPO_ENFERMERA
 https://www.figma.com/design/EjOz8cznYa99bmKQBjsCko/NUEVA?node-id=0-1&t=jwdeFJzCoLPsuqlx-1
+
+modelos conceptual de datos, Modelo logico y fisica de base de datos, Diseño de Arquitectura, Diseño De Base de datos
+https://drive.google.com/drive/folders/1sbxiqVQV1kT5mgErnjlme4HKjslH0LTj?usp=sharing
