@@ -34,3 +34,6 @@ https://www.figma.com/design/EjOz8cznYa99bmKQBjsCko/NUEVA?node-id=0-1&t=jwdeFJzC
 
 Modelos conceptual de datos, Modelo logico y fisica de base de datos, Diseño de Arquitectura, Diseño De Base de datos
 https://drive.google.com/drive/folders/1sbxiqVQV1kT5mgErnjlme4HKjslH0LTj?usp=sharing
+
+Documentación de la Etapa de Diseño – NurseNote
+https://unilibrebog-my.sharepoint.com/:w:/g/personal/eduarf-ultengop_unilibre_edu_co/IQCclMKEtJA5R58aqrx5QR0zAdGD5rseUVVTtzGl7ep3Ag0?e=2sd8bY
