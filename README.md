@@ -26,6 +26,9 @@ https://unilibrebog-my.sharepoint.com/:x:/g/personal/eduarf-ultengop_unilibre_ed
 Plantilla solicitud de cambio
 https://unilibrebog-my.sharepoint.com/:w:/g/personal/karolm-rodriguezs_unilibre_edu_co/IQCUNFeeFZqMSrUExN_0OePlAfvIVNgIfZEO-BaQcXYOuew?e=Mejhh1
 
+Diagrama EDT
+https://docs.google.com/spreadsheets/d/12i9cb_yrDKXSLvtvGSv579lidXJuSPY0Hs8s4RWD2qI/edit?gid=797736637#gid=797736637
+
 FIGMA_PROTOTIPO_ADMINISTRADOR
 https://www.figma.com/design/yJ7AT0QH2rLCQzPgSs9S4y/Usuario_Enfermeras?node-id=0-1&t=8FYpPBKJgqC5OM4l-1
 
