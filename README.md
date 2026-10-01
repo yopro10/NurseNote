@@ -24,7 +24,7 @@ Evaluación de riesgos
 https://unilibrebog-my.sharepoint.com/:x:/g/personal/eduarf-ultengop_unilibre_edu_co/IQCNlVnHTpnQRoEr48zPHm_NAWY1AUAlXhPFVdCNl7ggApI?e=AbKtkz
 
 Plantilla solicitud de cambio
-https://unilibrebog-my.sharepoint.com/:w:/g/personal/karolm-rodriguezs_unilibre_edu_co/IQCUNFeeFZqMSrUExN_0OePlAfvIVNgIfZEO-BaQcXYOuew?e=Mejhh1
+https://unilibrebog-my.sharepoint.com/:w:/g/personal/andresc-barcor_unilibre_edu_co/IQDFyAIXpXexSq1vX24d2moAAbSfTQsPYEsh0o1vwSuMyAg?e=SpaOZw
 
 Diagrama EDT
 https://docs.google.com/spreadsheets/d/12i9cb_yrDKXSLvtvGSv579lidXJuSPY0Hs8s4RWD2qI/edit?gid=797736637#gid=797736637
