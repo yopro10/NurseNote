@@ -1,0 +1,211 @@
+/* ============================================================================
+   TEMA "CALIDEZ CLÍNICA" — se carga después de index.css y lo sobrescribe.
+   Fondo crema, tipografía serif amable para títulos, y un color propio
+   por sección (--tema) que tiñe cabeceras, botones y acentos.
+============================================================================ */
+:root {
+  --fondo-app: #fbf6ee;
+  --superficie-2: #fdfaf4;
+  --superficie-3: #f3ebdd;
+  --borde: #ece1cf;
+  --borde-fuerte: #d9c9ae;
+  --texto: #1d2b27;
+  --texto-2: #46544f;
+  --texto-3: #66746e;
+  --tinta: #0f3b33;
+  --tinta-2: #17564a;
+  --verde: #0f7a5c;
+  --verde-profundo: #0b5c45;
+  --verde-menta: #7be0b4;
+  --sol: #f4b23e;
+  --coral: #e0584a;
+  --fuente-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --fuente-base: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --sombra-xs: 0 1px 2px rgba(80, 55, 20, 0.06);
+  --sombra-sm: 0 4px 14px rgba(80, 55, 20, 0.08);
+  --sombra-md: 0 14px 34px rgba(80, 55, 20, 0.13);
+  --degradado-marca: linear-gradient(135deg, #0f7a5c 0%, #0e8f86 100%);
+}
+h1, h2, h3 { font-optical-sizing: auto; letter-spacing: -0.015em; }
+
+/* ---- Un color por sección --------------------------------------------- */
+[data-tema] { --tema: #0f7a5c; --tema-suave: #dff4ea; --tema-fuerte: #0b5c45; }
+[data-tema='signos'] { --tema: #d4465c; --tema-suave: #fde4e8; --tema-fuerte: #a62c40; }
+[data-tema='medicamentos'] { --tema: #6d4fd0; --tema-suave: #ece6fb; --tema-fuerte: #4f35a8; }
+[data-tema='residentes'] { --tema: #1f78b4; --tema-suave: #dcedf8; --tema-fuerte: #145a8a; }
+[data-tema='inventario'] { --tema: #c27a0a; --tema-suave: #fdecc8; --tema-fuerte: #8f5600; }
+[data-tema='estadisticas'] { --tema: #0e8f86; --tema-suave: #d6f2ef; --tema-fuerte: #096b64; }
+[data-tema='inicio'] { --tema: #0f7a5c; --tema-suave: #dff4ea; --tema-fuerte: #0b5c45; }
+
+.boton--tema { background: var(--tema); color: #fff; box-shadow: 0 6px 14px color-mix(in srgb, var(--tema) 28%, transparent); }
+.boton--tema:hover:not(:disabled) { background: var(--tema-fuerte); transform: translateY(-1px); }
+.boton--primario { background: var(--degradado-marca); }
+.boton { border-radius: 14px; }
+.chip--activo { background: var(--tema); border-color: var(--tema); }
+.chip--activo:hover { background: var(--tema-fuerte); border-color: var(--tema-fuerte); }
+.buscador:focus-within, .campo input:focus, .campo textarea:focus {
+  border-color: var(--tema, var(--azul)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tema, #0a74ab) 18%, transparent);
+}
+
+/* ---- Sidebar claro, con iconos de color -------------------------------- */
+.sidebar { background: #fffdf8; color: var(--texto); border-right: 1px solid var(--borde); }
+.sidebar__marca-subtitulo, .sidebar__grupo-titulo, .sidebar__pie-texto small { color: var(--texto-3); }
+.sidebar__nav { border-top-color: var(--borde); }
+.sidebar__grupo-titulo { font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+.sidebar__item { color: var(--texto-2); font-weight: 600; }
+.sidebar__item:hover { background: var(--superficie-3); color: var(--texto); }
+.sidebar__item-icono {
+  width: 36px; height: 36px; border-radius: 11px; align-items: center; justify-content: center;
+  background: var(--ic-bg, var(--superficie-3)); color: var(--ic, var(--texto-2));
+}
+.sidebar__item[data-seccion='dashboard'] { --ic: #0f7a5c; --ic-bg: #dff4ea; }
+.sidebar__item[data-seccion='notas'] { --ic: #0f7a5c; --ic-bg: #dff4ea; }
+.sidebar__item[data-seccion='signos'] { --ic: #d4465c; --ic-bg: #fde4e8; }
+.sidebar__item[data-seccion='medicamentos'] { --ic: #6d4fd0; --ic-bg: #ece6fb; }
+.sidebar__item[data-seccion='pacientes'] { --ic: #1f78b4; --ic-bg: #dcedf8; }
+.sidebar__item[data-seccion='inventario'] { --ic: #c27a0a; --ic-bg: #fdecc8; }
+.sidebar__item[data-seccion='estadisticas'] { --ic: #0e8f86; --ic-bg: #d6f2ef; }
+.sidebar__item--activo { background: var(--ic-bg); color: var(--texto); font-weight: 800; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic) 35%, transparent); }
+.sidebar__item--activo::before { display: none; }
+.sidebar__item--activo .sidebar__item-icono { background: var(--ic); color: #fff; }
+.sidebar__pie { background: var(--superficie-3); }
+.sidebar__pie .avatar { background: var(--tinta); color: #fff; }
+.sidebar__salir { color: var(--texto-3); }
+.sidebar__salir:hover { background: #fff; color: var(--coral); }
+
+/* ---- Header y cabeceras de página ------------------------------------- */
+.header { background: rgba(251, 246, 238, 0.88); border-bottom-color: var(--borde); }
+.metrica { background: #fff; }
+.pagina-cabecera {
+  position: relative; overflow: hidden; padding: 26px 30px; border-radius: 22px;
+  background: var(--tema-suave); border: 1px solid color-mix(in srgb, var(--tema) 20%, transparent);
+}
+.pagina-cabecera::after {
+  content: ''; position: absolute; right: -40px; top: -60px; width: 220px; height: 220px; border-radius: 50%;
+  background: color-mix(in srgb, var(--tema) 14%, transparent);
+}
+.pagina-cabecera > * { position: relative; z-index: 1; }
+.pagina-cabecera h2 { color: var(--tema-fuerte); font-weight: 700; }
+.pagina-cabecera p { color: var(--texto-2); }
+.enlace-volver:hover { color: var(--tema-fuerte); }
+
+/* ---- Login: el ECG ya no cruza el texto -------------------------------- */
+.login-arte { background: radial-gradient(90% 80% at 100% 0%, #1d6b5c 0%, var(--tinta) 62%); align-items: flex-start; padding-top: 12vh; }
+.login-arte__ecg { bottom: 0; height: 90px; opacity: 0.5; }
+.login-arte::before {
+  content: ''; position: absolute; left: -90px; bottom: 90px; width: 300px; height: 300px; border-radius: 50%;
+  background: var(--sol); opacity: 0.16;
+}
+.login-arte__contenido h2 { font-weight: 600; font-size: 2.7rem; }
+.login-arte__lista { margin-bottom: 120px; }
+.login-pantalla, .login-panel { background: var(--fondo-app); }
+.login-arte__lista-icono { background: rgba(123, 224, 180, 0.16); }
+
+/* ---- Inicio ------------------------------------------------------------ */
+.bienvenida {
+  background: radial-gradient(70% 120% at 100% 0%, #1d7a68 0%, var(--tinta) 70%);
+  padding: 40px 44px 76px; border-radius: 28px;
+}
+.bienvenida::before {
+  content: ''; position: absolute; right: 70px; top: -70px; width: 190px; height: 190px; border-radius: 50%;
+  background: var(--sol); opacity: 0.9; filter: blur(0.5px);
+}
+.bienvenida__ecg { bottom: 0; height: 56px; opacity: 0.55; }
+.bienvenida__texto { z-index: 1; }
+.bienvenida__texto h2 { font-weight: 600; font-size: 2.6rem; }
+.bienvenida__aviso { z-index: 1; align-self: start; margin-top: 40px; background: rgba(255, 255, 255, 0.14); }
+
+.tarjeta-resumen { border: none; background: var(--sup-t, #e6f3fb); box-shadow: none; border-radius: 22px; }
+.tarjeta-resumen { --sup-t: #e3f1fa; }
+.tarjeta-resumen--observacion { --sup-t: #fdecc8; }
+.tarjeta-resumen--critico { --sup-t: #fde4e0; }
+.tarjeta-resumen--estable { --sup-t: #dff4ea; }
+.tarjeta-resumen__icono { background: #fff; border-radius: 16px; box-shadow: var(--sombra-xs); }
+.tarjeta-resumen__valor { font-weight: 600; font-size: 2.5rem; }
+
+.dashboard__dos { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
+.atencion { background: #fff; border: 1px solid var(--borde); border-radius: 22px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+.atencion .seccion-titulo { margin-bottom: 6px; }
+.atencion__vacio { color: var(--texto-3); padding: 18px 0; }
+.atencion__fila {
+  display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; padding: 12px 14px;
+  background: var(--superficie-2); border: 1px solid var(--borde); border-left: 5px solid var(--ambar);
+  border-radius: 14px; transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.atencion__fila--crit { border-left-color: var(--coral); }
+.atencion__fila:hover { transform: translateX(3px); box-shadow: var(--sombra-sm); }
+.atencion__datos { flex: 1; min-width: 0; }
+.atencion__datos strong { display: block; }
+.atencion__datos small { color: var(--texto-3); }
+.atencion__fila > svg { color: var(--texto-3); }
+
+.aviso-inventario {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 26px;
+  border-radius: 22px; border: none; color: #4a2f00; background: linear-gradient(160deg, #fcd98a 0%, #f4b23e 100%);
+}
+.aviso-inventario--ok { background: linear-gradient(160deg, #c9efdc 0%, #8fdcb9 100%); color: #0b3d2c; }
+.aviso-inventario__icono { width: 52px; height: 52px; border-radius: 16px; background: rgba(255, 255, 255, 0.6); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.aviso-inventario strong { font-family: var(--fuente-display); font-size: 1.5rem; font-weight: 600; line-height: 1.15; }
+.aviso-inventario small { font-size: 0.92rem; opacity: 0.85; }
+.aviso-inventario__ir { margin-top: auto; padding-top: 18px; display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 0.92rem; }
+
+.tarjeta-modulo { border-radius: 24px; border: none; background: var(--acento-suave); box-shadow: none; padding: 28px 24px 22px; }
+.tarjeta-modulo.m-notas { --acento: #0f7a5c; --acento-suave: #dff4ea; }
+.tarjeta-modulo.m-signos { --acento: #c23a50; --acento-suave: #fde4e8; }
+.tarjeta-modulo.m-meds { --acento: #5d40bf; --acento-suave: #ece6fb; }
+.tarjeta-modulo.m-res { --acento: #1768a0; --acento-suave: #dcedf8; }
+.tarjeta-modulo:hover { transform: translateY(-4px); box-shadow: var(--sombra-md); border: none; }
+.tarjeta-modulo { transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.25s ease; }
+.tarjeta-modulo__icono { background: #fff; border-radius: 18px; box-shadow: var(--sombra-xs); }
+.tarjeta-modulo__titulo { font-weight: 600; font-size: 1.3rem; }
+.tarjeta-modulo__descripcion { color: var(--texto-2); }
+
+/* ---- Residentes (tarjetas) -------------------------------------------- */
+.residentes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 1fr)); gap: 18px; }
+.residente {
+  --estado: var(--verde); position: relative; display: flex; flex-direction: column; gap: 8px;
+  background: #fff; border: 1px solid var(--borde); border-radius: 22px; padding: 22px; box-shadow: var(--sombra-xs);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.residente::before { content: ''; position: absolute; left: 22px; right: 22px; top: 0; height: 5px; border-radius: 0 0 6px 6px; background: var(--estado); }
+.residente--obs { --estado: #e8a020; }
+.residente--crit { --estado: var(--coral); }
+.residente:hover { transform: translateY(-3px); box-shadow: var(--sombra-md); }
+.residente__cabecera { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.residente__cabecera .avatar { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--estado); }
+.residente__hab { background: var(--superficie-3); border-radius: 999px; padding: 5px 13px; font-size: 0.85rem; font-weight: 800; color: var(--texto-2); }
+.residente h3 { font-size: 1.28rem; font-weight: 600; }
+.residente__dx { color: var(--texto-3); font-size: 0.93rem; min-height: 1.4em; }
+.residente__datos { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.residente__datos .dato { gap: 5px; }
+.residente .boton { margin-top: auto; }
+.residentes__vacio { text-align: center; color: var(--texto-3); padding: 64px 24px; background: #fff; border: 1px dashed var(--borde-fuerte); border-radius: 22px; }
+
+/* ---- Resto de componentes, ya con la nueva paleta ----------------------- */
+.tabla-contenedor, .panel, .tarjeta-formulario, .tarjeta-historial, .ficha-paciente { border-radius: 22px; }
+.tabla th { background: var(--tema-suave); color: var(--tema-fuerte); }
+.ficha-paciente { border-top: 6px solid var(--tema); }
+.ficha-paciente h2, .panel__total { font-weight: 600; }
+.tarjeta-formulario h3, .tarjeta-historial h3, .panel__cabecera h3 { font-weight: 600; }
+.badge--verde { background: #dff4ea; } .badge--ambar { background: #fdecc8; } .badge--rojo { background: #fde4e0; }
+.modal-tarjeta { border-radius: 28px; }
+.modal-tarjeta h2 { font-weight: 600; }
+.spinner { border-top-color: var(--tema, var(--verde)); }
+
+@media (max-width: 1180px) { .dashboard__dos { grid-template-columns: 1fr; } }
+@media (max-width: 800px) {
+  .sidebar { padding-inline: 10px; }
+  .sidebar__item-icono { width: 40px; height: 40px; }
+  .pagina-cabecera { padding: 22px 20px; }
+  .bienvenida { padding: 30px 26px 70px; }
+  .bienvenida__aviso { margin-top: 12px; }
+}
+
+/* ---- Pulidos ------------------------------------------------------------ */
+.header__titulo p { text-transform: none; }
+.header__titulo p::first-letter { text-transform: uppercase; }
+.tarjeta-resumen .tarjeta-resumen__icono { background: #fff; }
+.login-arte::before { left: auto; bottom: auto; right: -70px; top: -70px; width: 240px; height: 240px; opacity: 0.22; }
+.ficha-paciente { border-top: 1px solid var(--borde); box-shadow: inset 0 6px 0 var(--tema), var(--sombra-xs); padding-top: 28px; }
+.residente::before { top: -1px; }
+.tabla__numero { white-space: nowrap; }
