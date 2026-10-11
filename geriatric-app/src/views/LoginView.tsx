@@ -123,6 +123,9 @@ export default function LoginView() {
                 </button>
               ))}
             </div>
+            <small style={{ display: 'block', marginTop: '12px', color: 'var(--texto-3)' }}>
+              ⚠️ El registro de nuevos usuarios solo está disponible para administradores.
+            </small>
           </div>
         </form>
       </section>

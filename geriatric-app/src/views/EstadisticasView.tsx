@@ -31,6 +31,7 @@ function Medida({ etiqueta, valor, total, color }: MedidaProps) {
 
 export default function EstadisticasView() {
   const [estadisticas, setEstadisticas] = useState<EstadisticasData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Simular carga de estadísticas
@@ -48,10 +49,18 @@ export default function EstadisticasView() {
     <div>
       <PageHeader titulo="Estadísticas del sistema" descripcion="Métricas generales de residentes, personal y registros clínicos del hogar." />
 
-      {!estadisticas ? (
+      {error ? (
+        <div className="cargando-bloque" role="alert">
+          <p className="alerta alerta--error">Error: {error}</p>
+        </div>
+      ) : !estadisticas ? (
         <div className="cargando-bloque" role="status">
           <div className="spinner" />
           <p>Calculando estadísticas…</p>
+        </div>
+      ) : estadisticas.pacientes.total === 0 ? (
+        <div className="cargando-bloque">
+          <p>No hay datos disponibles para mostrar estadísticas.</p>
         </div>
       ) : (
         <div className="panel-grid">

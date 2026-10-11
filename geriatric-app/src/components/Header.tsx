@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAccesibilidad } from '../context/AccesibilidadContext';
 import type { VistaApp } from '../types';
+import BusquedaGlobal from './BusquedaGlobal';
+import { IconoBuscar } from './Icons';
 
 const TITULOS_VISTA: Record<VistaApp, string> = {
   login: 'Iniciar sesión',
@@ -12,6 +15,8 @@ const TITULOS_VISTA: Record<VistaApp, string> = {
   estadisticas: 'Estadísticas',
   inventario_medicamentos: 'Inventario',
   registro: 'Registro clínico',
+  usuarios: 'Gestión de Usuarios',
+  ficha_residente: 'Ficha del Residente',
 };
 
 const ROLES: Record<string, string> = {
@@ -27,7 +32,25 @@ const formatearRol = (rol: string) => ROLES[rol] || rol;
 
 export default function Header() {
   const { usuarioActual, metricas, vista, cerrarSesion, moduloSeleccionado } = useApp();
+  const { tamanoLetra, cambiarTamanoLetra } = useAccesibilidad();
   const [perfilAbierto, setPerfilAbierto] = useState(false);
+  const [busquedaAbierta, setBusquedaAbierta] = useState(false);
+
+  // Atajo de teclado para búsqueda global
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setBusquedaAbierta(true);
+      }
+      if (e.key === 'Escape' && busquedaAbierta) {
+        setBusquedaAbierta(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [busquedaAbierta]);
 
   if (!usuarioActual) return null;
 
@@ -49,6 +72,30 @@ export default function Header() {
       </div>
 
       <div className="header__derecha">
+        {/* Botón de búsqueda global */}
+        <button
+          className="boton boton--fantasma"
+          onClick={() => setBusquedaAbierta(true)}
+          aria-label="Búsqueda global"
+          title="Búsqueda global (Ctrl+K)"
+        >
+          <IconoBuscar size={20} />
+        </button>
+
+        {/* Selector de tamaño de letra */}
+        <div className="header__accesibilidad">
+          <select
+            value={tamanoLetra}
+            onChange={(e) => cambiarTamanoLetra(e.target.value as 'normal' | 'grande' | 'muy-grande')}
+            className="boton boton--pequeno"
+            aria-label="Tamaño de letra"
+          >
+            <option value="normal">A</option>
+            <option value="grande">A+</option>
+            <option value="muy-grande">A++</option>
+          </select>
+        </div>
+
         {metricas && vista !== 'dashboard' && (
           <div className="header__metricas" aria-label="Resumen del día">
             <div className="metrica">
@@ -115,6 +162,8 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {busquedaAbierta && <BusquedaGlobal onClose={() => setBusquedaAbierta(false)} />}
     </header>
   );
 }

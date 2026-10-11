@@ -32,6 +32,7 @@ interface ItemMenu {
 interface GrupoMenu {
   titulo?: string;
   items: ItemMenu[];
+  roles?: string[]; // Si se especifica, solo mostrar a estos roles
 }
 
 const GRUPOS: GrupoMenu[] = [
@@ -52,8 +53,14 @@ const GRUPOS: GrupoMenu[] = [
       { id: 'pacientes', etiqueta: 'Residentes', icono: <IconoPacientes /> },
       { id: 'inventario', etiqueta: 'Inventario', icono: <IconoInventario /> },
       { id: 'estadisticas', etiqueta: 'Estadísticas', icono: <IconoEstadisticas /> },
+    ],
+  },
+  {
+    titulo: 'Administración',
+    items: [
       { id: 'usuarios', etiqueta: 'Usuarios', icono: <IconoAlerta /> },
     ],
+    roles: ['administrador', 'jefe_enfermeria'], // Solo visible para admin y jefe
   },
 ];
 
@@ -117,7 +124,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="sidebar__nav" aria-label="Navegación principal">
-        {GRUPOS.map((grupo, i) => (
+        {GRUPOS.filter(grupo => !grupo.roles || grupo.roles.includes(usuarioActual?.rol || '')).map((grupo, i) => (
           <div className="sidebar__grupo" key={grupo.titulo ?? i}>
             {grupo.titulo && <span className="sidebar__grupo-titulo">{grupo.titulo}</span>}
             {grupo.items.map((item) => {

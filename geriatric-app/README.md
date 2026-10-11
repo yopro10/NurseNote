@@ -17,38 +17,62 @@ git clone https://github.com/yopro10/NurseNote.git
 cd geriatric-app
 ```
 
-### 2. Configurar Backend
+### 2. Configurar el Proyecto (Automático - Recomendado)
 
+**Opción A - Usar npm (todas las plataformas):**
+```bash
+npm run setup
+```
+
+**Opción B - Windows:**
+```bash
+setup.bat
+```
+
+**Opción C - Mac/Linux:**
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+El script interactivo te pedirá:
+- Contraseña de PostgreSQL
+- Configuración opcional del servidor (puertos, URLs)
+- Generará automáticamente los archivos `.env`
+- Instalará todas las dependencias
+
+### 3. Configuración Manual (Opcional)
+
+Si prefieres configurar manualmente:
+
+**Backend:**
 ```bash
 cd backend
 npm install
 ```
 
-Crear archivo `.env` en la carpeta `backend` con el siguiente contenido:
+Crear archivo `.env` en la carpeta `backend` basándote en `backend/.env.example`:
 
 ```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=geriatric_app
 DB_USER=postgres
-DB_PASSWORD=yopro1015
+DB_PASSWORD=tu_contraseña_postgresql_aqui
 PORT=3000
 NODE_ENV=development
-JWT_SECRET=geriatric-app-secret-key-2024
+JWT_SECRET=your-secret-key-change-this-in-production
 JWT_EXPIRES_IN=24h
 FRONTEND_URL=http://localhost:5173
 ```
 
-**Nota:** Cambia `DB_PASSWORD` por tu contraseña de PostgreSQL.
-
-### 3. Configurar Frontend
-
+**Frontend:**
 ```bash
 cd ..
 npm install
 ```
 
-Crear archivo `.env` en la carpeta raíz con el siguiente contenido:
+Crear archivo `.env` en la carpeta raíz basándote en `.env.example`:
 
 ```env
 VITE_API_URL=http://localhost:3000
@@ -255,8 +279,10 @@ npm install
 
 - La primera vez que inicies el backend, se creará la base de datos automáticamente
 - Los datos de prueba se cargan solo si la base de datos está vacía
-- Las contraseñas están en texto plano en el código (para desarrollo)
-- En producción, usar variables de ambiente y hashear contraseñas
+- Las contraseñas de PostgreSQL se configuran mediante variables de entorno (.env)
+- Los archivos .env NO se incluyen en el repositorio (ver .gitignore)
+- Cada desarrollador debe configurar su propia contraseña de PostgreSQL
+- En producción, usar variables de ambiente seguras y hashear contraseñas
 
 ## 🤝 Contribuir
 

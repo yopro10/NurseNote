@@ -112,6 +112,18 @@ export class MedicamentoModel {
     return result.rows[0];
   }
 
+  static async ajustarStock(id, cantidad, motivo) {
+    const query = `
+      UPDATE medicamentos
+      SET cantidad_disponible = $1,
+          fecha_actualizacion = NOW()
+      WHERE id = $2
+      RETURNING *
+    `;
+    const result = await pool.query(query, [cantidad, id]);
+    return result.rows[0];
+  }
+
   static async getMedicamentosProximosVencer(dias = 30) {
     const query = `
       SELECT * FROM medicamentos

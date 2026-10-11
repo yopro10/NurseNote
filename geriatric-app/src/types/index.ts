@@ -124,7 +124,7 @@ export interface ModuloAcceso {
 }
 
 /** Vistas disponibles dentro del enrutador principal (SPA). */
-export type VistaApp = 'login' | 'dashboard' | 'notas_enfermeria' | 'signos_vitales' | 'medicamentos' | 'gestion_pacientes' | 'estadisticas' | 'inventario_medicamentos' | 'registro' | 'usuarios';
+export type VistaApp = 'login' | 'dashboard' | 'notas_enfermeria' | 'signos_vitales' | 'medicamentos' | 'gestion_pacientes' | 'estadisticas' | 'inventario_medicamentos' | 'registro' | 'usuarios' | 'ficha_residente';
 
 /** Estado clínico derivado de cada residente. */
 export type EstadoPaciente = 'Estable' | 'En Observación' | 'Crítico';

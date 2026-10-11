@@ -50,6 +50,7 @@ type AppAction =
   | { type: 'IR_A_ESTADISTICAS' }
   | { type: 'IR_A_INVENTARIO_MEDICAMENTOS' }
   | { type: 'IR_A_USUARIOS' }
+  | { type: 'IR_A_FICHA_RESIDENTE'; paciente: PacienteConCalculos }
   | { type: 'IR_A_REGISTRO'; paciente: PacienteConCalculos }
   | { type: 'SET_PACIENTES'; pacientes: PacienteConCalculos[] }
   | { type: 'SET_NOTAS_PACIENTE'; notas: NotaEnfermeria[] }
@@ -97,6 +98,8 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, vista: 'inventario_medicamentos', moduloSeleccionado: null, pacienteSeleccionado: null };
     case 'IR_A_USUARIOS':
       return { ...state, vista: 'usuarios', moduloSeleccionado: null, pacienteSeleccionado: null };
+    case 'IR_A_FICHA_RESIDENTE':
+      return { ...state, vista: 'ficha_residente', pacienteSeleccionado: action.paciente };
     case 'IR_A_REGISTRO':
       return { ...state, vista: 'registro', pacienteSeleccionado: action.paciente };
     case 'SET_PACIENTES':
@@ -125,6 +128,7 @@ interface AppContextValue extends AppState {
   irAEstadisticas: () => void;
   irAInventarioMedicamentos: () => void;
   irAUsuarios: () => void;
+  irAFichaResidente: (paciente: PacienteConCalculos) => void;
   seleccionarModulo: (modulo: TipoNota) => void;
   seleccionarPaciente: (paciente: PacienteConCalculos) => Promise<void>;
   buscarPacientes: (query: string) => Promise<void>;
@@ -194,6 +198,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const irAEstadisticas = useCallback(() => dispatch({ type: 'IR_A_ESTADISTICAS' }), []);
   const irAInventarioMedicamentos = useCallback(() => dispatch({ type: 'IR_A_INVENTARIO_MEDICAMENTOS' }), []);
   const irAUsuarios = useCallback(() => dispatch({ type: 'IR_A_USUARIOS' }), []);
+  const irAFichaResidente = useCallback((paciente: PacienteConCalculos) => dispatch({ type: 'IR_A_FICHA_RESIDENTE', paciente }), []);
 
   const seleccionarModulo = useCallback((modulo: TipoNota) => {
     switch (modulo) {
@@ -255,6 +260,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       irAEstadisticas,
       irAInventarioMedicamentos,
       irAUsuarios,
+      irAFichaResidente,
       seleccionarModulo,
       seleccionarPaciente,
       buscarPacientes,

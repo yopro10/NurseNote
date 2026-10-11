@@ -1,0 +1,19 @@
+/* ============================================================================
+   ACCESIBILIDAD - Tamaño de letra
+============================================================================ */
+
+:root {
+  --tamano-base: 16px;
+}
+
+[data-tamano-letra="grande"] {
+  --tamano-base: 18px;
+}
+
+[data-tamano-letra="muy-grande"] {
+  --tamano-base: 20px;
+}
+
+html {
+  font-size: var(--tamano-base);
+}

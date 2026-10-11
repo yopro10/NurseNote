@@ -11,6 +11,7 @@ import RegisterFormView from './views/RegisterFormView';
 import EstadisticasView from './views/EstadisticasView';
 import InventarioMedicamentosView from './views/InventarioMedicamentosView';
 import UsuariosView from './views/UsuariosView';
+import FichaResidenteView from './views/FichaResidenteView';
 import NotificationToast from './components/NotificationToast';
 
 /**
@@ -33,6 +34,7 @@ function EnrutadorPrincipal() {
           inventario_medicamentos: 'inventario',
           estadisticas: 'estadisticas',
           usuarios: 'usuarios',
+          ficha_residente: 'residentes',
         } as Record<string, string>)[vista] ?? 'inicio';
 
   if (cargandoSesion) {
@@ -64,6 +66,7 @@ function EnrutadorPrincipal() {
             {vista === 'inventario_medicamentos' && <InventarioMedicamentosView />}
             {vista === 'registro' && <RegisterFormView />}
             {vista === 'usuarios' && <UsuariosView />}
+            {vista === 'ficha_residente' && <FichaResidenteView />}
           </div>
         </main>
       </div>

@@ -178,6 +178,8 @@ h1, h2, h3 { font-optical-sizing: auto; letter-spacing: -0.015em; }
 .residente__dx { color: var(--texto-3); font-size: 0.93rem; min-height: 1.4em; }
 .residente__datos { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
 .residente__datos .dato { gap: 5px; }
+.residente__acciones { display: flex; flex-direction: column; gap: 8px; }
+.residente__acciones-secundarias { display: flex; gap: 8px; }
 .residente .boton { margin-top: auto; }
 .residentes__vacio { text-align: center; color: var(--texto-3); padding: 64px 24px; background: #fff; border: 1px dashed var(--borde-fuerte); border-radius: 22px; }
 

@@ -5,9 +5,16 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/plus-jakarta-sans';
 import './index.css';
 import './tema.css';
+import './accesibilidad.css';
+import { AccesibilidadProvider } from './context/AccesibilidadContext';
+import { NotificationProvider } from './context/NotificationContext';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <AccesibilidadProvider>
+      <NotificationProvider>
+        <App />
+      </NotificationProvider>
+    </AccesibilidadProvider>
   </React.StrictMode>
 );

@@ -43,8 +43,35 @@ export class UserModel {
   }
 
   static async delete(id) {
-    const query = 'DELETE FROM usuarios WHERE id = $1 RETURNING id';
+    const query = `
+      UPDATE usuarios
+      SET activo = false, fecha_actualizacion = NOW()
+      WHERE id = $1
+      RETURNING id, nombre, apellido, email, rol, activo
+    `;
     const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
+
+  static async reactivate(id) {
+    const query = `
+      UPDATE usuarios
+      SET activo = true, fecha_actualizacion = NOW()
+      WHERE id = $1
+      RETURNING id, nombre, apellido, email, rol, activo
+    `;
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
+
+  static async resetPassword(id, newPassword) {
+    const query = `
+      UPDATE usuarios
+      SET password = $1, fecha_actualizacion = NOW()
+      WHERE id = $2
+      RETURNING id, nombre, apellido, email, rol
+    `;
+    const result = await pool.query(query, [newPassword, id]);
     return result.rows[0];
   }
 }

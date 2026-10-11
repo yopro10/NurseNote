@@ -7,6 +7,8 @@ import pacienteRoutes from './routes/pacienteRoutes.js';
 import notaRoutes from './routes/notaRoutes.js';
 import medicamentoRoutes from './routes/medicamentoRoutes.js';
 import medicamentoPacienteRoutes from './routes/medicamentoPacienteRoutes.js';
+import signosVitalesRoutes from './routes/signosVitalesRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 import metricasRoutes from './routes/metricasRoutes.js';
 import initializeDatabase from '../scripts/initDatabase.js';
 
@@ -33,6 +35,8 @@ app.use('/api/pacientes', pacienteRoutes);
 app.use('/api/notas', notaRoutes);
 app.use('/api/medicamentos', medicamentoRoutes);
 app.use('/api/medicamentos-pacientes', medicamentoPacienteRoutes);
+app.use('/api/signos-vitales', signosVitalesRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/metricas', metricasRoutes);
 
 // Health check

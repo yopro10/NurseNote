@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import { executeSQLFile } from './sqlParser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,27 +48,37 @@ async function initializeDatabase() {
     await dbClient.connect();
     console.log('✅ Conectado a base de datos geriatric_app');
 
-    // Leer y ejecutar el schema
-    const schemaPath = path.join(__dirname, '../database/schema.sql');
-    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+    // Ejecutar migraciones en orden
+    const migrationsPath = path.join(__dirname, '../database/migrations');
+    const migrationFiles = fs.readdirSync(migrationsPath)
+      .filter(file => file.endsWith('.sql'))
+      .sort(); // Ordenar alfabéticamente (001, 002, etc.)
 
-    // Dividir el schema en sentencias individuales
-    const statements = schemaSql
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+    console.log(`📋 Ejecutando ${migrationFiles.length} migraciones...`);
 
-    for (const statement of statements) {
-      try {
-        await dbClient.query(statement);
-      } catch (err) {
-        // Ignorar errores de tablas que ya existen
-        if (!err.message.includes('already exists')) {
-          console.warn('⚠️  Advertencia en schema:', err.message);
-        }
+    let totalErrors = 0;
+    for (const file of migrationFiles) {
+      console.log(`  📄 Ejecutando ${file}...`);
+      const filePath = path.join(migrationsPath, file);
+      const migrationSql = fs.readFileSync(filePath, 'utf8');
+      const errors = await executeSQLFile(dbClient, migrationSql);
+
+      if (errors.length > 0) {
+        console.warn(`    ⚠️  ${errors.length} advertencias en ${file}:`);
+        errors.forEach(err => {
+          console.warn(`      - ${err.error}`);
+        });
+        totalErrors += errors.length;
+      } else {
+        console.log(`    ✅ ${file} ejecutado correctamente`);
       }
     }
-    console.log('✅ Schema ejecutado correctamente');
+
+    if (totalErrors > 0) {
+      console.warn(`⚠️  Total de ${totalErrors} advertencias durante las migraciones`);
+    }
+
+    console.log('✅ Migraciones ejecutadas correctamente');
 
     // Verificar si hay usuarios, si no, crear datos de prueba
     const usersResult = await dbClient.query('SELECT COUNT(*) as count FROM usuarios');

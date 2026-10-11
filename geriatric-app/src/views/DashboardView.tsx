@@ -1,5 +1,6 @@
 import { useApp } from '../context/AppContext';
 import type { ModuloAcceso } from '../types';
+import { useState, useEffect } from 'react';
 import {
   IconoAlerta,
   IconoFlecha,
@@ -59,9 +60,31 @@ function saludo(): string {
 }
 
 export default function DashboardView() {
-  const { pacientes, seleccionarPaciente, irAInventarioMedicamentos, usuarioActual, hogarActual, metricas, irANotasEnfermeria, irASignosVitales, irAMedicamentos, irAGestionPacientes } = useApp();
+  const { pacientes, seleccionarPaciente, irAInventarioMedicamentos, usuarioActual, hogarActual, irANotasEnfermeria, irASignosVitales, irAMedicamentos, irAGestionPacientes } = useApp();
+  const [metricasReales, setMetricasReales] = useState<any>(null);
+  const [cargandoMetricas, setCargandoMetricas] = useState(true);
 
   const nombreUsuario = usuarioActual?.nombre || 'equipo';
+
+  useEffect(() => {
+    cargarMetricasReales();
+  }, []);
+
+  const cargarMetricasReales = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/dashboard/metricas', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+      const data = await response.json();
+      setMetricasReales(data);
+    } catch (error) {
+      console.error('Error al cargar métricas:', error);
+    } finally {
+      setCargandoMetricas(false);
+    }
+  };
 
   const handleModuloClick = (moduloId: string) => {
     switch (moduloId) {
@@ -80,12 +103,18 @@ export default function DashboardView() {
     }
   };
 
-  const criticos = metricas?.pacientesCriticos ?? 0;
+  const criticos = metricasReales?.pacientes?.criticos ?? 0;
+  const observacion = metricasReales?.pacientes?.observacion ?? 0;
+  const estables = metricasReales?.pacientes?.estables ?? 0;
+  const totalPacientes = metricasReales?.pacientes?.total ?? 0;
+  const registrosHoy = (metricasReales?.hoy?.notas ?? 0) + (metricasReales?.hoy?.signos ?? 0);
+  const alertasInv = (metricasReales?.medicamentos?.vencidos ?? 0) + (metricasReales?.medicamentos?.proximos_vencer ?? 0) + (metricasReales?.medicamentos?.stock_bajo ?? 0);
+  const pendientes = metricasReales?.administraciones?.pendientes ?? 0;
+
   const prioritarios = pacientes
     .filter((p) => p.estado !== 'Estable')
     .sort((a, b) => (a.estado === 'Crítico' ? -1 : 1) - (b.estado === 'Crítico' ? -1 : 1))
     .slice(0, 4);
-  const alertasInv = (metricas?.medicamentosVencidos ?? 0) + (metricas?.medicamentosBajoStock ?? 0);
 
   return (
     <div className="dashboard">
@@ -101,7 +130,7 @@ export default function DashboardView() {
           </p>
         </div>
 
-        {metricas && (
+        {metricasReales && (
           <div className={`bienvenida__aviso ${criticos === 0 ? 'bienvenida__aviso--ok' : ''}`} role="status">
             <span className="bienvenida__aviso-numero">{criticos}</span>
             <span>
@@ -115,14 +144,14 @@ export default function DashboardView() {
         )}
       </section>
 
-      {metricas && (
+      {metricasReales && (
         <section className="resumen" aria-label="Resumen del hogar">
           <div className="tarjeta-resumen">
             <span className="tarjeta-resumen__icono">
               <IconoPacientes size={26} />
             </span>
             <div>
-              <span className="tarjeta-resumen__valor">{metricas.totalPacientes}</span>
+              <span className="tarjeta-resumen__valor">{totalPacientes}</span>
               <span className="tarjeta-resumen__etiqueta">Residentes activos</span>
             </div>
           </div>
@@ -131,7 +160,7 @@ export default function DashboardView() {
               <IconoAlerta size={26} />
             </span>
             <div>
-              <span className="tarjeta-resumen__valor">{metricas.pacientesEnObservacion}</span>
+              <span className="tarjeta-resumen__valor">{observacion}</span>
               <span className="tarjeta-resumen__etiqueta">En observación</span>
             </div>
           </div>
@@ -140,7 +169,7 @@ export default function DashboardView() {
               <IconoVitales size={26} />
             </span>
             <div>
-              <span className="tarjeta-resumen__valor">{metricas.pacientesCriticos}</span>
+              <span className="tarjeta-resumen__valor">{criticos}</span>
               <span className="tarjeta-resumen__etiqueta">Estado crítico</span>
             </div>
           </div>
@@ -149,7 +178,7 @@ export default function DashboardView() {
               <IconoNotas size={26} />
             </span>
             <div>
-              <span className="tarjeta-resumen__valor">{metricas.registrosHoy}</span>
+              <span className="tarjeta-resumen__valor">{registrosHoy}</span>
               <span className="tarjeta-resumen__etiqueta">Registros hoy</span>
             </div>
           </div>
@@ -178,7 +207,7 @@ export default function DashboardView() {
         <button type="button" className={`aviso-inventario ${alertasInv === 0 ? 'aviso-inventario--ok' : ''}`} onClick={irAInventarioMedicamentos}>
           <span className="aviso-inventario__icono"><IconoMedicamentos size={26} /></span>
           <strong>{alertasInv === 0 ? 'Inventario al día' : `${alertasInv} ${alertasInv === 1 ? 'alerta' : 'alertas'} de inventario`}</strong>
-          <small>{metricas?.medicamentosVencidos ?? 0} {metricas?.medicamentosVencidos === 1 ? 'vencido' : 'vencidos'} · {metricas?.medicamentosBajoStock ?? 0} con stock bajo</small>
+          <small>{metricasReales?.medicamentos?.vencidos ?? 0} {metricasReales?.medicamentos?.vencidos === 1 ? 'vencido' : 'vencidos'} · {metricasReales?.medicamentos?.stock_bajo ?? 0} con stock bajo</small>
           <span className="aviso-inventario__ir">Revisar inventario <IconoFlecha size={16} /></span>
         </button>
       </section>

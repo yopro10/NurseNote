@@ -23,13 +23,17 @@ interface PatientPickerProps {
   titulo: string;
   descripcion: string;
   textoAccion?: string;
+  onSeleccionar?: (paciente: any) => void;
+  onEditar?: (paciente: any) => void;
+  onEgresar?: (paciente: any) => void;
+  mostrarAcciones?: boolean;
 }
 
 /**
  * Lista de residentes con buscador, filtro por estado y acción de registro.
  * Reutilizada por Notas de enfermería, Signos vitales, Medicamentos y Residentes.
  */
-export default function PatientPicker({ titulo, descripcion, textoAccion = 'Registrar' }: PatientPickerProps) {
+export default function PatientPicker({ titulo, descripcion, textoAccion = 'Registrar', onSeleccionar, onEditar, onEgresar, mostrarAcciones = false }: PatientPickerProps) {
   const { pacientes, buscarPacientes, seleccionarPaciente } = useApp();
   const [query, setQuery] = useState('');
   const [filtro, setFiltro] = useState<'todos' | EstadoPaciente>('todos');
@@ -107,9 +111,31 @@ export default function PatientPicker({ titulo, descripcion, textoAccion = 'Regi
                   </span>
                 )}
               </div>
-              <button type="button" className="boton boton--tema boton--bloque" onClick={() => seleccionarPaciente(p)}>
-                {textoAccion}
-              </button>
+              <div className="residente__acciones">
+                <button type="button" className="boton boton--tema boton--bloque" onClick={() => onSeleccionar ? onSeleccionar(p) : seleccionarPaciente(p)}>
+                  {textoAccion}
+                </button>
+                {mostrarAcciones && (
+                  <div className="residente__acciones-secundarias">
+                    <button
+                      type="button"
+                      className="boton boton--pequeno boton--secundario"
+                      onClick={() => onEditar ? onEditar(p) : null}
+                      title="Editar residente"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="boton boton--pequeno boton--secundario"
+                      onClick={() => onEgresar ? onEgresar(p) : null}
+                      title="Egresar residente"
+                    >
+                      Egresar
+                    </button>
+                  </div>
+                )}
+              </div>
             </li>
           ))}
         </ul>

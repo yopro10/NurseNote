@@ -151,8 +151,40 @@ export class NotaModel {
   }
 
   static async delete(id) {
-    const query = 'DELETE FROM notas_enfermeria WHERE id = $1 RETURNING id';
+    // Las notas no se borran, se corrigen con una nota aclaratoria
+    // Este método desactiva la nota original
+    const query = `
+      UPDATE notas_enfermeria
+      SET contenido = contenido || ' [NOTA CORREGIDA - VER NOTA DE CORRECCIÓN]',
+      observaciones = COALESCE(observaciones, '') || ' Esta nota fue corregida. Vea la nota de corrección.',
+      fecha_actualizacion = NOW()
+      WHERE id = $1
+      RETURNING *
+    `;
     const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
+
+  static async createCorreccion(id, datos) {
+    // Crea una nota de corrección que referencia a la nota original
+    const query = `
+      INSERT INTO notas_enfermeria (
+        paciente_id, usuario_id, tipo_nota, contenido, observaciones, estado_paciente, fecha_registro
+      )
+      SELECT 
+        paciente_id, 
+        $1 as usuario_id, 
+        'correccion' as tipo_nota,
+        $2 as contenido,
+        $3 as observaciones,
+        estado_paciente,
+        NOW()
+      FROM notas_enfermeria
+      WHERE id = $4
+      RETURNING *
+    `;
+    const values = [datos.usuario_id, datos.contenido, datos.observaciones, id];
+    const result = await pool.query(query, values);
     return result.rows[0];
   }
 

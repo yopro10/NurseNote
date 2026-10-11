@@ -111,6 +111,35 @@ export class MedicamentoController {
     }
   }
 
+  static async ajustarStock(req, res) {
+    try {
+      const { id } = req.params;
+      const { cantidad, motivo } = req.body;
+
+      if (cantidad === undefined || cantidad === null) {
+        return res.status(400).json({ error: 'Cantidad es requerida' });
+      }
+
+      if (!motivo) {
+        return res.status(400).json({ error: 'Motivo del ajuste es requerido' });
+      }
+
+      const medicamentoActualizado = await MedicamentoModel.ajustarStock(id, cantidad, motivo);
+
+      if (!medicamentoActualizado) {
+        return res.status(404).json({ error: 'Medicamento no encontrado' });
+      }
+
+      res.json({
+        message: 'Stock ajustado exitosamente',
+        medicamento: medicamentoActualizado
+      });
+    } catch (error) {
+      console.error('Error al ajustar stock:', error);
+      res.status(500).json({ error: 'Error al ajustar stock' });
+    }
+  }
+
   static async getAlertas(req, res) {
     try {
       const alertas = await MedicamentoModel.getAlertas();
