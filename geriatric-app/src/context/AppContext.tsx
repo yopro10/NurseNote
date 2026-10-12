@@ -1,280 +1,87 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
-import type {
-  Usuario,
-  NotaEnfermeria,
-  HogarInfo,
-  Metricas,
-  VistaApp,
-  TipoNota,
-} from '../types';
-import type { PacienteConCalculos } from '../utils/patientHelpers';
-import * as authService from '../services/authService';
-import * as pacienteService from '../services/pacienteService';
-import * as hogarService from '../services/hogarService';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { api } from '../api/client';
+import type { Paciente, Usuario, VistaApp } from '../types';
 
-/**
- * ============================================================================
- * CONTEXT + REDUCER (Capa Controller)
- * Orquesta las llamadas a los servicios (Model) y expone el estado
- * resultante a las vistas (View) a través del hook useApp().
- * ============================================================================
- */
+/** Destino de navegación: la "ruta" de la SPA (sin librería externa). */
+export interface Destino { vista: VistaApp; pacienteId?: number; tab?: string; id?: number }
 
-interface AppState {
+interface Ctx {
   cargandoSesion: boolean;
-  usuarioActual: Usuario | null;
-  hogarActual: HogarInfo | null;
-  metricas: Metricas | null;
-
-  vista: VistaApp;
-  moduloSeleccionado: TipoNota | null;
-  pacienteSeleccionado: PacienteConCalculos | null;
-
-  pacientes: PacienteConCalculos[];
-  notasPacienteActual: NotaEnfermeria[];
-
-  cargando: boolean;
-  error: string | null;
-}
-
-type AppAction =
-  | { type: 'SESION_RESTAURADA'; usuario: Usuario | null }
-  | { type: 'LOGIN_EXITOSO'; usuario: Usuario }
-  | { type: 'LOGOUT' }
-  | { type: 'SET_HOGAR'; hogar: HogarInfo | null; metricas: Metricas | null }
-  | { type: 'IR_A_DASHBOARD' }
-  | { type: 'IR_A_NOTAS_ENFERMERIA' }
-  | { type: 'IR_A_SIGNOS_VITALES' }
-  | { type: 'IR_A_MEDICAMENTOS' }
-  | { type: 'IR_A_GESTION_PACIENTES' }
-  | { type: 'IR_A_ESTADISTICAS' }
-  | { type: 'IR_A_INVENTARIO_MEDICAMENTOS' }
-  | { type: 'IR_A_USUARIOS' }
-  | { type: 'IR_A_FICHA_RESIDENTE'; paciente: PacienteConCalculos }
-  | { type: 'IR_A_REGISTRO'; paciente: PacienteConCalculos }
-  | { type: 'SET_PACIENTES'; pacientes: PacienteConCalculos[] }
-  | { type: 'SET_NOTAS_PACIENTE'; notas: NotaEnfermeria[] }
-  | { type: 'NOTA_CREADA'; nota: NotaEnfermeria }
-  | { type: 'SET_CARGANDO'; cargando: boolean }
-  | { type: 'SET_ERROR'; error: string | null };
-
-const estadoInicial: AppState = {
-  cargandoSesion: true,
-  usuarioActual: null,
-  hogarActual: null,
-  metricas: null,
-  vista: 'login',
-  moduloSeleccionado: null,
-  pacienteSeleccionado: null,
-  pacientes: [],
-  notasPacienteActual: [],
-  cargando: false,
-  error: null,
-};
-
-function reducer(state: AppState, action: AppAction): AppState {
-  switch (action.type) {
-    case 'SESION_RESTAURADA':
-      return { ...state, cargandoSesion: false, usuarioActual: action.usuario, vista: action.usuario ? 'dashboard' : 'login' };
-    case 'LOGIN_EXITOSO':
-      return { ...state, usuarioActual: action.usuario, vista: 'dashboard', error: null };
-    case 'LOGOUT':
-      return { ...estadoInicial, cargandoSesion: false };
-    case 'SET_HOGAR':
-      return { ...state, hogarActual: action.hogar, metricas: action.metricas };
-    case 'IR_A_DASHBOARD':
-      return { ...state, vista: 'dashboard', moduloSeleccionado: null, pacienteSeleccionado: null };
-    case 'IR_A_NOTAS_ENFERMERIA':
-      return { ...state, vista: 'notas_enfermeria', moduloSeleccionado: 'evolucion', pacienteSeleccionado: null };
-    case 'IR_A_SIGNOS_VITALES':
-      return { ...state, vista: 'signos_vitales', moduloSeleccionado: 'signos_vitales', pacienteSeleccionado: null };
-    case 'IR_A_MEDICAMENTOS':
-      return { ...state, vista: 'medicamentos', moduloSeleccionado: 'medicacion', pacienteSeleccionado: null };
-    case 'IR_A_GESTION_PACIENTES':
-      return { ...state, vista: 'gestion_pacientes', moduloSeleccionado: null, pacienteSeleccionado: null };
-    case 'IR_A_ESTADISTICAS':
-      return { ...state, vista: 'estadisticas', moduloSeleccionado: null, pacienteSeleccionado: null };
-    case 'IR_A_INVENTARIO_MEDICAMENTOS':
-      return { ...state, vista: 'inventario_medicamentos', moduloSeleccionado: null, pacienteSeleccionado: null };
-    case 'IR_A_USUARIOS':
-      return { ...state, vista: 'usuarios', moduloSeleccionado: null, pacienteSeleccionado: null };
-    case 'IR_A_FICHA_RESIDENTE':
-      return { ...state, vista: 'ficha_residente', pacienteSeleccionado: action.paciente };
-    case 'IR_A_REGISTRO':
-      return { ...state, vista: 'registro', pacienteSeleccionado: action.paciente };
-    case 'SET_PACIENTES':
-      return { ...state, pacientes: action.pacientes };
-    case 'SET_NOTAS_PACIENTE':
-      return { ...state, notasPacienteActual: action.notas };
-    case 'NOTA_CREADA':
-      return { ...state, notasPacienteActual: [action.nota, ...state.notasPacienteActual] };
-    case 'SET_CARGANDO':
-      return { ...state, cargando: action.cargando };
-    case 'SET_ERROR':
-      return { ...state, error: action.error };
-    default:
-      return state;
-  }
-}
-
-interface AppContextValue extends AppState {
+  usuario: Usuario | null;
+  destino: Destino;
+  pacientes: Paciente[];
+  tick: number; // se incrementa tras mutaciones para que las vistas recarguen
   iniciarSesion: (email: string, password: string) => Promise<void>;
   cerrarSesion: () => Promise<void>;
-  irADashboard: () => void;
-  irANotasEnfermeria: () => void;
-  irASignosVitales: () => void;
-  irAMedicamentos: () => void;
-  irAGestionPacientes: () => void;
-  irAEstadisticas: () => void;
-  irAInventarioMedicamentos: () => void;
-  irAUsuarios: () => void;
-  irAFichaResidente: (paciente: PacienteConCalculos) => void;
-  seleccionarModulo: (modulo: TipoNota) => void;
-  seleccionarPaciente: (paciente: PacienteConCalculos) => Promise<void>;
-  buscarPacientes: (query: string) => Promise<void>;
-  guardarNota: (datos: Omit<NotaEnfermeria, 'id' | 'fecha_registro' | 'usuario_id'>) => Promise<void>;
-  limpiarError: () => void;
+  ir: (vista: VistaApp, extra?: Omit<Destino, 'vista'>) => void;
+  recargarPacientes: () => Promise<void>;
+  refrescar: () => void;
+  esGestor: boolean;
+  esAdmin: boolean;
 }
 
-const AppContext = createContext<AppContextValue | undefined>(undefined);
+const AppCtx = createContext<Ctx | undefined>(undefined);
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, estadoInicial);
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [destino, setDestino] = useState<Destino>({ vista: 'dashboard' });
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [tick, setTick] = useState(0);
 
-  // Restaura la sesión activa al cargar la aplicación (JWT persistido)
-  useEffect(() => {
-    authService.getSesionActiva().then((usuario) => {
-      dispatch({ type: 'SESION_RESTAURADA', usuario });
-    });
+  const limpiarSesion = useCallback(() => {
+    localStorage.removeItem('auth_token');
+    setUsuario(null);
+    setPacientes([]);
+    setDestino({ vista: 'dashboard' });
   }, []);
 
-  // Carga el hogar y sus métricas cada vez que hay un usuario autenticado
   useEffect(() => {
-    if (!state.usuarioActual) return;
-    let cancelado = false;
+    if (!localStorage.getItem('auth_token')) { setCargandoSesion(false); return; }
+    api.get<Usuario>('/auth/profile').then(setUsuario).catch(() => localStorage.removeItem('auth_token')).finally(() => setCargandoSesion(false));
+  }, []);
 
-    Promise.all([
-      hogarService.getHogarPorId('hogar-01'),
-      hogarService.getMetricasHogar('hogar-01'),
-    ]).then(([hogar, metricas]) => {
-      if (!cancelado) dispatch({ type: 'SET_HOGAR', hogar: hogar ?? null, metricas });
-    });
+  useEffect(() => {
+    const alExpirar = () => limpiarSesion();
+    window.addEventListener('auth:expirada', alExpirar);
+    return () => window.removeEventListener('auth:expirada', alExpirar);
+  }, [limpiarSesion]);
 
-    pacienteService.getPacientes().then((pacientes) => {
-      if (!cancelado) dispatch({ type: 'SET_PACIENTES', pacientes });
-    });
+  const recargarPacientes = useCallback(async () => {
+    try { setPacientes(await api.get<Paciente[]>('/pacientes')); } catch { /* el error se muestra en cada vista */ }
+  }, []);
 
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.usuarioActual?.id]);
+  useEffect(() => { if (usuario) recargarPacientes(); }, [usuario, recargarPacientes, tick]);
 
   const iniciarSesion = useCallback(async (email: string, password: string) => {
-    dispatch({ type: 'SET_CARGANDO', cargando: true });
-    dispatch({ type: 'SET_ERROR', error: null });
-    try {
-      const response = await authService.login({ email, password });
-      authService.saveAuthData(response.token, response.user);
-      dispatch({ type: 'LOGIN_EXITOSO', usuario: response.user });
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Error desconocido.' });
-    } finally {
-      dispatch({ type: 'SET_CARGANDO', cargando: false });
-    }
+    const r = await api.post<{ token: string; user: Usuario }>('/auth/login', { email, password });
+    localStorage.setItem('auth_token', r.token);
+    setUsuario(r.user);
+    setDestino({ vista: 'dashboard' });
   }, []);
 
   const cerrarSesion = useCallback(async () => {
-    await authService.logout();
-    dispatch({ type: 'LOGOUT' });
+    try { await api.post('/auth/logout'); } catch { /* aunque falle, se cierra localmente */ }
+    limpiarSesion();
+  }, [limpiarSesion]);
+
+  const ir = useCallback((vista: VistaApp, extra: Omit<Destino, 'vista'> = {}) => {
+    setDestino({ vista, ...extra });
+    document.querySelector('.app__contenido')?.scrollTo({ top: 0 });
   }, []);
 
-  const irADashboard = useCallback(() => dispatch({ type: 'IR_A_DASHBOARD' }), []);
+  const refrescar = useCallback(() => setTick((t) => t + 1), []);
 
-  const irANotasEnfermeria = useCallback(() => dispatch({ type: 'IR_A_NOTAS_ENFERMERIA' }), []);
-  const irASignosVitales = useCallback(() => dispatch({ type: 'IR_A_SIGNOS_VITALES' }), []);
-  const irAMedicamentos = useCallback(() => dispatch({ type: 'IR_A_MEDICAMENTOS' }), []);
-  const irAGestionPacientes = useCallback(() => dispatch({ type: 'IR_A_GESTION_PACIENTES' }), []);
-  const irAEstadisticas = useCallback(() => dispatch({ type: 'IR_A_ESTADISTICAS' }), []);
-  const irAInventarioMedicamentos = useCallback(() => dispatch({ type: 'IR_A_INVENTARIO_MEDICAMENTOS' }), []);
-  const irAUsuarios = useCallback(() => dispatch({ type: 'IR_A_USUARIOS' }), []);
-  const irAFichaResidente = useCallback((paciente: PacienteConCalculos) => dispatch({ type: 'IR_A_FICHA_RESIDENTE', paciente }), []);
+  const valor = useMemo<Ctx>(() => ({
+    cargandoSesion, usuario, destino, pacientes, tick, iniciarSesion, cerrarSesion, ir, recargarPacientes, refrescar,
+    esGestor: usuario?.rol === 'administrador' || usuario?.rol === 'jefe_enfermeria', esAdmin: usuario?.rol === 'administrador',
+  }), [cargandoSesion, usuario, destino, pacientes, tick, iniciarSesion, cerrarSesion, ir, recargarPacientes, refrescar]);
 
-  const seleccionarModulo = useCallback((modulo: TipoNota) => {
-    switch (modulo) {
-      case 'evolucion':
-      case 'ingreso':
-      case 'egreso':
-      case 'observacion':
-        dispatch({ type: 'IR_A_NOTAS_ENFERMERIA' });
-        break;
-      case 'signos_vitales':
-        dispatch({ type: 'IR_A_SIGNOS_VITALES' });
-        break;
-      case 'medicacion':
-        dispatch({ type: 'IR_A_MEDICAMENTOS' });
-        break;
-      default:
-        dispatch({ type: 'IR_A_NOTAS_ENFERMERIA' });
-    }
-  }, []);
-
-  const seleccionarPaciente = useCallback(async (paciente: PacienteConCalculos) => {
-    dispatch({ type: 'IR_A_REGISTRO', paciente });
-    dispatch({ type: 'SET_CARGANDO', cargando: true });
-    const notas = await pacienteService.getNotasPorPaciente(paciente.id);
-    dispatch({ type: 'SET_NOTAS_PACIENTE', notas });
-    dispatch({ type: 'SET_CARGANDO', cargando: false });
-  }, []);
-
-  const buscarPacientes = useCallback(async (query: string) => {
-    const pacientes = await pacienteService.buscarPacientes(query);
-    dispatch({ type: 'SET_PACIENTES', pacientes });
-  }, []);
-
-  const guardarNota = useCallback(
-    async (datos: Omit<NotaEnfermeria, 'id' | 'fecha_registro' | 'usuario_id'>) => {
-      if (!state.usuarioActual) return;
-      dispatch({ type: 'SET_CARGANDO', cargando: true });
-      const nota = await pacienteService.crearNota(datos);
-      dispatch({ type: 'NOTA_CREADA', nota });
-      const metricas = await hogarService.getMetricasHogar('hogar-01');
-      dispatch({ type: 'SET_HOGAR', hogar: state.hogarActual, metricas });
-      dispatch({ type: 'SET_CARGANDO', cargando: false });
-    },
-    [state.usuarioActual, state.hogarActual]
-  );
-
-  const limpiarError = useCallback(() => dispatch({ type: 'SET_ERROR', error: null }), []);
-
-  const value = useMemo<AppContextValue>(
-    () => ({
-      ...state,
-      iniciarSesion,
-      cerrarSesion,
-      irADashboard,
-      irANotasEnfermeria,
-      irASignosVitales,
-      irAMedicamentos,
-      irAGestionPacientes,
-      irAEstadisticas,
-      irAInventarioMedicamentos,
-      irAUsuarios,
-      irAFichaResidente,
-      seleccionarModulo,
-      seleccionarPaciente,
-      buscarPacientes,
-      guardarNota,
-      limpiarError,
-    }),
-    [state, iniciarSesion, cerrarSesion, irADashboard, irANotasEnfermeria, irASignosVitales, irAMedicamentos, irAGestionPacientes, irAEstadisticas, irAInventarioMedicamentos, irAUsuarios, seleccionarModulo, seleccionarPaciente, buscarPacientes, guardarNota, limpiarError]
-  );
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return <AppCtx.Provider value={valor}>{children}</AppCtx.Provider>;
 }
 
-export function useApp(): AppContextValue {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useApp debe usarse dentro de un <AppProvider>.');
-  return context;
+export function useApp(): Ctx {
+  const c = useContext(AppCtx);
+  if (!c) throw new Error('useApp debe usarse dentro de <AppProvider>');
+  return c;
 }

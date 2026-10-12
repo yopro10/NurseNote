@@ -1,241 +1,97 @@
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { api } from '../api/client';
 import { useApp } from '../context/AppContext';
-import type { ModuloAcceso } from '../types';
-import { useState, useEffect } from 'react';
-import {
-  IconoAlerta,
-  IconoFlecha,
-  IconoMedicamentos,
-  IconoNotas,
-  IconoPacientes,
-  IconoVitales,
-  TrazoECG,
-} from '../components/Icons';
+import { Avatar, Cargando, EstadoBadge, ErrorBox, ExportarBotones, Vacio, useCarga } from '../components/ui';
+import { IconoAlerta, IconoFlecha, IconoInventario, IconoMedicamentos, IconoNotas, IconoPacientes, IconoTurno, IconoVitales } from '../components/Icons';
+import { fmtDiaCorto, fmtHora, hace } from '../utils/format';
 
-const ICONOS: Record<ModuloAcceso['icono'], JSX.Element> = {
-  notas: <IconoNotas size={28} />,
-  vitales: <IconoVitales size={28} />,
-  medicamentos: <IconoMedicamentos size={28} />,
-  pacientes: <IconoPacientes size={28} />,
-};
-
-const ACENTO_MODULO: Record<ModuloAcceso['icono'], string> = {
-  notas: 'm-notas',
-  vitales: 'm-signos',
-  medicamentos: 'm-meds',
-  pacientes: 'm-res',
-};
-
-const MODULOS: ModuloAcceso[] = [
-  {
-    id: 'evolucion',
-    titulo: 'Notas de enfermería',
-    descripcion: 'Registra observaciones clínicas y la evolución diaria de cada residente.',
-    icono: 'notas',
-  },
-  {
-    id: 'signos_vitales',
-    titulo: 'Signos vitales',
-    descripcion: 'Presión arterial, frecuencia cardíaca, temperatura y saturación de oxígeno.',
-    icono: 'vitales',
-  },
-  {
-    id: 'medicacion',
-    titulo: 'Medicamentos',
-    descripcion: 'Documenta la entrega y dosificación de medicamentos por residente.',
-    icono: 'medicamentos',
-  },
-  {
-    id: 'pacientes',
-    titulo: 'Residentes',
-    descripcion: 'Consulta la lista completa de residentes y su información básica.',
-    icono: 'pacientes',
-  },
-];
-
-function saludo(): string {
-  const hora = new Date().getHours();
-  if (hora < 12) return 'Buenos días';
-  if (hora < 19) return 'Buenas tardes';
-  return 'Buenas noches';
+interface Resumen {
+  pacientes: { total: number; criticos: number; observacion: number; estables: number };
+  registrosHoy: { notas: number; signos: number; administraciones: number; total: number };
+  inventario: { vencidos: number; por_vencer: number; bajo_stock: number; total: number };
+  medicacion: { administradas: number; pendientes: number; atrasadas: number; omitidas: number; total: number; cumplimiento: number | null };
+  prioritarios: Array<{ id: number; nombre: string; apellido: string; habitacion?: string; estado: string; motivo?: string; fecha_ultimo_estado?: string }>;
+  proximasDosis: Array<{ id: number; horario_programado: string; paciente_id: number; nombre: string; apellido: string; habitacion?: string; medicamento: string; dosis_prescrita?: string; atrasada: boolean }>;
+  ultimos7dias: Array<{ fecha: string; notas: number; signos: number; administraciones: number }>;
+  alertasVitales: Array<{ nivel: number; residente: string; habitacion?: string; paciente_id: number; fecha: string; hallazgos: Array<{ texto: string }> }>;
+  ultimoTurno: { id: number; fecha_entrega: string; turno?: string; confirmada: boolean; saliente?: string; entrante?: string } | null;
 }
 
+function saludo() { const h = new Date().getHours(); return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'; }
+
 export default function DashboardView() {
-  const { pacientes, seleccionarPaciente, irAInventarioMedicamentos, usuarioActual, hogarActual, irANotasEnfermeria, irASignosVitales, irAMedicamentos, irAGestionPacientes } = useApp();
-  const [metricasReales, setMetricasReales] = useState<any>(null);
-  const [cargandoMetricas, setCargandoMetricas] = useState(true);
+  const { usuario, ir, tick } = useApp();
+  const { datos: d, cargando, error, recargar } = useCarga(() => api.get<Resumen>('/dashboard/resumen'), [tick]);
 
-  const nombreUsuario = usuarioActual?.nombre || 'equipo';
+  if (cargando && !d) return <Cargando texto="Cargando panel…" />;
+  if (error || !d) return <ErrorBox mensaje={error ?? 'No se pudo cargar el panel'} onReintentar={recargar} />;
 
-  useEffect(() => {
-    cargarMetricasReales();
-  }, []);
-
-  const cargarMetricasReales = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/api/dashboard/metricas', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      const data = await response.json();
-      setMetricasReales(data);
-    } catch (error) {
-      console.error('Error al cargar métricas:', error);
-    } finally {
-      setCargandoMetricas(false);
-    }
-  };
-
-  const handleModuloClick = (moduloId: string) => {
-    switch (moduloId) {
-      case 'evolucion':
-        irANotasEnfermeria();
-        break;
-      case 'signos_vitales':
-        irASignosVitales();
-        break;
-      case 'medicacion':
-        irAMedicamentos();
-        break;
-      case 'pacientes':
-        irAGestionPacientes();
-        break;
-    }
-  };
-
-  const criticos = metricasReales?.pacientes?.criticos ?? 0;
-  const observacion = metricasReales?.pacientes?.observacion ?? 0;
-  const estables = metricasReales?.pacientes?.estables ?? 0;
-  const totalPacientes = metricasReales?.pacientes?.total ?? 0;
-  const registrosHoy = (metricasReales?.hoy?.notas ?? 0) + (metricasReales?.hoy?.signos ?? 0);
-  const alertasInv = (metricasReales?.medicamentos?.vencidos ?? 0) + (metricasReales?.medicamentos?.proximos_vencer ?? 0) + (metricasReales?.medicamentos?.stock_bajo ?? 0);
-  const pendientes = metricasReales?.administraciones?.pendientes ?? 0;
-
-  const prioritarios = pacientes
-    .filter((p) => p.estado !== 'Estable')
-    .sort((a, b) => (a.estado === 'Crítico' ? -1 : 1) - (b.estado === 'Crítico' ? -1 : 1))
-    .slice(0, 4);
+  const alertasInv = d.inventario.vencidos + d.inventario.por_vencer + d.inventario.bajo_stock;
+  const serie = d.ultimos7dias.map((x) => ({ ...x, dia: fmtDiaCorto(x.fecha) }));
 
   return (
-    <div className="dashboard">
+    <>
       <section className="bienvenida">
-        <TrazoECG className="bienvenida__ecg" />
-        <div className="bienvenida__texto">
-          <h2>
-            {saludo()}, {nombreUsuario}
-          </h2>
-          <p>
-            Este es el resumen de {hogarActual?.nombre ?? 'tu hogar geriátrico'} para hoy. Elige un módulo para
-            empezar a registrar.
-          </p>
+        <div>
+          <h2>{saludo()}, {usuario?.nombre}</h2>
+          <p>{d.pacientes.criticos === 0 ? 'Ningún residente en estado crítico.' : `${d.pacientes.criticos} residente${d.pacientes.criticos === 1 ? '' : 's'} en estado crítico requiere${d.pacientes.criticos === 1 ? '' : 'n'} seguimiento.`}
+            {d.medicacion.atrasadas > 0 && ` ${d.medicacion.atrasadas} dosis atrasada${d.medicacion.atrasadas === 1 ? '' : 's'}.`}</p>
         </div>
-
-        {metricasReales && (
-          <div className={`bienvenida__aviso ${criticos === 0 ? 'bienvenida__aviso--ok' : ''}`} role="status">
-            <span className="bienvenida__aviso-numero">{criticos}</span>
-            <span>
-              {criticos === 0
-                ? 'Ningún residente en estado crítico'
-                : criticos === 1
-                  ? 'residente en estado crítico necesita seguimiento'
-                  : 'residentes en estado crítico necesitan seguimiento'}
-            </span>
-          </div>
-        )}
+        <button className="btn" onClick={() => ir('turnos')}><IconoTurno size={15} /> Entregar turno</button>
+        <ExportarBotones tipo="residentes" etiqueta="Exportar residentes" />
       </section>
 
-      {metricasReales && (
-        <section className="resumen" aria-label="Resumen del hogar">
-          <div className="tarjeta-resumen">
-            <span className="tarjeta-resumen__icono">
-              <IconoPacientes size={26} />
-            </span>
-            <div>
-              <span className="tarjeta-resumen__valor">{totalPacientes}</span>
-              <span className="tarjeta-resumen__etiqueta">Residentes activos</span>
-            </div>
-          </div>
-          <div className="tarjeta-resumen tarjeta-resumen--observacion">
-            <span className="tarjeta-resumen__icono">
-              <IconoAlerta size={26} />
-            </span>
-            <div>
-              <span className="tarjeta-resumen__valor">{observacion}</span>
-              <span className="tarjeta-resumen__etiqueta">En observación</span>
-            </div>
-          </div>
-          <div className="tarjeta-resumen tarjeta-resumen--critico">
-            <span className="tarjeta-resumen__icono">
-              <IconoVitales size={26} />
-            </span>
-            <div>
-              <span className="tarjeta-resumen__valor">{criticos}</span>
-              <span className="tarjeta-resumen__etiqueta">Estado crítico</span>
-            </div>
-          </div>
-          <div className="tarjeta-resumen tarjeta-resumen--estable">
-            <span className="tarjeta-resumen__icono">
-              <IconoNotas size={26} />
-            </span>
-            <div>
-              <span className="tarjeta-resumen__valor">{registrosHoy}</span>
-              <span className="tarjeta-resumen__etiqueta">Registros hoy</span>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="dashboard__dos">
-        <div className="atencion">
-          <div className="seccion-titulo">
-            <h3>Requieren atención hoy</h3>
-            <p>{prioritarios.length} residentes</p>
-          </div>
-          {prioritarios.length === 0 && <p className="atencion__vacio">Todo en calma: ningún residente en observación.</p>}
-          {prioritarios.map((p) => (
-            <button key={p.id} type="button" className={`atencion__fila atencion__fila--${p.estado === 'Crítico' ? 'crit' : 'obs'}`} onClick={() => seleccionarPaciente(p)}>
-              <span className={`avatar avatar--tono-${p.id % 6}`}>{p.avatarIniciales}</span>
-              <span className="atencion__datos">
-                <strong>{p.nombreCompleto}</strong>
-                <small>Hab. {p.habitacion} · {p.diagnosticoPrincipal}</small>
-              </span>
-              <span className={p.estado === 'Crítico' ? 'badge badge--rojo' : 'badge badge--ambar'}>{p.estado}</span>
-              <IconoFlecha size={18} />
-            </button>
-          ))}
-        </div>
-        <button type="button" className={`aviso-inventario ${alertasInv === 0 ? 'aviso-inventario--ok' : ''}`} onClick={irAInventarioMedicamentos}>
-          <span className="aviso-inventario__icono"><IconoMedicamentos size={26} /></span>
-          <strong>{alertasInv === 0 ? 'Inventario al día' : `${alertasInv} ${alertasInv === 1 ? 'alerta' : 'alertas'} de inventario`}</strong>
-          <small>{metricasReales?.medicamentos?.vencidos ?? 0} {metricasReales?.medicamentos?.vencidos === 1 ? 'vencido' : 'vencidos'} · {metricasReales?.medicamentos?.stock_bajo ?? 0} con stock bajo</small>
-          <span className="aviso-inventario__ir">Revisar inventario <IconoFlecha size={16} /></span>
-        </button>
+      <section className="kpis" aria-label="Resumen del hogar">
+        <button className="kpi" onClick={() => ir('residentes')}><span className="kpi__ic"><IconoPacientes size={18} /></span><span><b>{d.pacientes.total}</b><span>Residentes activos</span></span></button>
+        <button className="kpi kpi--warn" onClick={() => ir('residentes')}><span className="kpi__ic"><IconoAlerta size={18} /></span><span><b>{d.pacientes.observacion}</b><span>En observación</span></span></button>
+        <button className="kpi kpi--crit" onClick={() => ir('residentes')}><span className="kpi__ic"><IconoVitales size={18} /></span><span><b>{d.pacientes.criticos}</b><span>Estado crítico</span></span></button>
+        <button className="kpi kpi--ok" onClick={() => ir('notas')}><span className="kpi__ic"><IconoNotas size={18} /></span><span><b>{d.registrosHoy.total}</b><span>Registros hoy</span></span></button>
+        <button className="kpi kpi--mor" onClick={() => ir('medicamentos')}><span className="kpi__ic"><IconoMedicamentos size={18} /></span>
+          <span><b>{d.medicacion.cumplimiento === null ? '—' : `${d.medicacion.cumplimiento}%`}</b><span>Medicación de hoy</span></span></button>
+        <button className={`kpi ${alertasInv ? 'kpi--warn' : 'kpi--ok'}`} onClick={() => ir('inventario')}><span className="kpi__ic"><IconoInventario size={18} /></span><span><b>{alertasInv}</b><span>Alertas de inventario</span></span></button>
       </section>
 
-      <section>
-        <div className="seccion-titulo">
-          <h3>Módulos de registro</h3>
-          <p>Elige por dónde empezar el turno</p>
+      <section className="grid2">
+        <div className="card">
+          <div className="card__t"><h3>Requieren atención</h3><small>{d.prioritarios.length} residentes</small></div>
+          {!d.prioritarios.length ? <Vacio icono="🌿" texto="Todo en calma: ningún residente en observación." /> : (
+            <ul className="lista">{d.prioritarios.map((p) => (
+              <li key={p.id}><button className={`fila fila--${p.estado === 'Crítico' ? 'crit' : 'warn'}`} onClick={() => ir('ficha', { pacienteId: p.id })}>
+                <Avatar nombre={p.nombre} apellido={p.apellido} id={p.id} sm />
+                <div><strong>{p.nombre} {p.apellido} · Hab. {p.habitacion ?? '—'}</strong><small className="clamp2">{p.motivo ?? ''}</small></div>
+                <EstadoBadge estado={p.estado} /><IconoFlecha size={14} /></button></li>))}</ul>)}
         </div>
-        <div className="dashboard__grid-tarjetas">
-          {MODULOS.map((modulo) => (
-            <button
-              key={modulo.id}
-              type="button"
-              className={`tarjeta-modulo ${ACENTO_MODULO[modulo.icono]}`}
-              onClick={() => handleModuloClick(modulo.id)}
-            >
-              <span className="tarjeta-modulo__icono">{ICONOS[modulo.icono]}</span>
-              <span className="tarjeta-modulo__titulo">{modulo.titulo}</span>
-              <span className="tarjeta-modulo__descripcion">{modulo.descripcion}</span>
-              <span className="tarjeta-modulo__accion">
-                Abrir
-                <IconoFlecha size={18} />
-              </span>
-            </button>
-          ))}
+
+        <div className="card">
+          <div className="card__t"><h3>Próximas dosis de hoy</h3><button className="btn btn--sm" onClick={() => ir('medicamentos')}>Ver todas</button></div>
+          {!d.proximasDosis.length ? <Vacio icono="💊" texto="No hay dosis pendientes para hoy." /> : (
+            <ul className="lista">{d.proximasDosis.map((x) => (
+              <li key={x.id}><button className={`fila ${x.atrasada ? 'fila--crit' : ''}`} onClick={() => ir('medicamentos')}>
+                <div><strong>{x.medicamento} {x.dosis_prescrita ?? ''}</strong><small>{x.nombre} {x.apellido} · Hab. {x.habitacion ?? '—'}</small></div>
+                <span className={`badge ${x.atrasada ? 'badge--crit' : 'badge--info'}`}>{x.atrasada ? 'Atrasada ' : ''}{fmtHora(x.horario_programado)}</span></button></li>))}</ul>)}
         </div>
       </section>
-    </div>
+
+      <section className="grid2">
+        <div className="card">
+          <div className="card__t"><h3>Actividad de los últimos 7 días</h3><small>Notas · signos · dosis</small></div>
+          <div className="grafica grafica--sm"><ResponsiveContainer>
+            <BarChart data={serie} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="#ece1cf" /><XAxis dataKey="dia" fontSize={11} /><YAxis allowDecimals={false} fontSize={11} />
+              <Tooltip /><Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="notas" name="Notas" fill="#0f7a5c" radius={[3, 3, 0, 0]} /><Bar dataKey="signos" name="Signos vitales" fill="#d4465c" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="administraciones" name="Dosis" fill="#6d4fd0" radius={[3, 3, 0, 0]} /></BarChart></ResponsiveContainer></div>
+        </div>
+        <div className="card">
+          <div className="card__t"><h3>Signos alterados (24 h)</h3><button className="btn btn--sm" onClick={() => ir('signos')}>Ver signos</button></div>
+          {!d.alertasVitales.length ? <Vacio icono="❤️" texto="Sin signos vitales alterados en las últimas 24 horas." /> : (
+            <ul className="lista">{d.alertasVitales.map((a) => (
+              <li key={a.paciente_id}><button className={`fila fila--${a.nivel === 2 ? 'crit' : 'warn'}`} onClick={() => ir('ficha', { pacienteId: a.paciente_id, tab: 'signos' })}>
+                <div><strong>{a.residente} · Hab. {a.habitacion ?? '—'}</strong><small>{a.hallazgos.map((h) => h.texto).join(' · ')}</small></div><small>{hace(a.fecha)}</small></button></li>))}</ul>)}
+          <div className="barra" style={{ marginTop: 8 }}>
+            <small>Último relevo: {d.ultimoTurno ? `${d.ultimoTurno.turno ?? ''} · ${d.ultimoTurno.saliente ?? ''} → ${d.ultimoTurno.entrante ?? ''} (${d.ultimoTurno.confirmada ? 'confirmado' : 'sin confirmar'})` : 'aún no hay entregas de turno'}</small>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

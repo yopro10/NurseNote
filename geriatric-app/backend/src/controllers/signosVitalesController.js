@@ -1,182 +1,102 @@
-import { SignosVitalesModel } from '../models/signosVitalesModel.js';
+import { SignosVitalesModel as M } from '../models/signosVitalesModel.js';
+import pool from '../config/database.js';
+import { asyncHandler, bad, forbidden, notFound, vacio } from '../utils/http.js';
+import { auditar } from '../middleware/auditMiddleware.js';
+import { esGestorRol } from '../middleware/authMiddleware.js';
+import { evaluarSignos, LIMITES } from '../services/rangos.js';
+import { recalcularEstado } from '../services/estadoPaciente.js';
 
-export class SignosVitalesController {
-  static async create(req, res) {
-    try {
-      const {
-        paciente_id,
-        usuario_id,
-        presion_sistolica,
-        presion_diastolica,
-        frecuencia_cardiaca,
-        temperatura,
-        saturacion_oxigeno,
-        frecuencia_respiratoria,
-        glucosa,
-        peso,
-        altura,
-        observaciones
-      } = req.body;
+const ENTEROS = ['presion_sistolica', 'presion_diastolica', 'frecuencia_cardiaca', 'saturacion_oxigeno', 'frecuencia_respiratoria', 'glucosa', 'altura'];
 
-      // Validaciones básicas
-      if (!paciente_id || !usuario_id) {
-        return res.status(400).json({ error: 'paciente_id y usuario_id son requeridos' });
-      }
-
-      const signos = await SignosVitalesModel.create({
-        paciente_id,
-        usuario_id,
-        presion_sistolica,
-        presion_diastolica,
-        frecuencia_cardiaca,
-        temperatura,
-        saturacion_oxigeno,
-        frecuencia_respiratoria,
-        glucosa,
-        peso,
-        altura,
-        observaciones
-      });
-
-      // Calcular alertas
-      const alertas = [];
-      if (saturacion_oxigeno < 90) alertas.push('SpO₂ crítico');
-      if (saturacion_oxigeno < 95 && saturacion_oxigeno >= 90) alertas.push('SpO₂ bajo');
-      if (presion_sistolica > 140 || presion_diastolica > 90) alertas.push('Presión alta');
-      if (presion_sistolica < 90 || presion_diastolica < 60) alertas.push('Presión baja');
-      if (temperatura > 38) alertas.push('Fiebre');
-      if (temperatura < 36) alertas.push('Hipotermia');
-      if (frecuencia_cardiaca > 100) alertas.push('Taquicardia');
-      if (frecuencia_cardiaca < 60) alertas.push('Bradicardia');
-
-      res.status(201).json({
-        message: 'Signos vitales registrados exitosamente',
-        data: signos,
-        alertas: alertas.length > 0 ? alertas : null
-      });
-    } catch (error) {
-      console.error('Error al registrar signos vitales:', error);
-      res.status(500).json({ error: 'Error al registrar signos vitales' });
-    }
+function limpiar(d, { crear }) {
+  const out = {};
+  for (const k of [...Object.keys(LIMITES), 'observaciones']) {
+    if (d[k] === undefined) continue;
+    if (k === 'observaciones') { out[k] = vacio(d[k]) ? null : String(d[k]).trim().slice(0, 1000); continue; }
+    if (vacio(d[k])) { out[k] = null; continue; }
+    const n = Number(d[k]);
+    if (Number.isNaN(n)) throw bad(`${k.replace(/_/g, ' ')} debe ser numérico`);
+    if (ENTEROS.includes(k) && !Number.isInteger(n)) throw bad(`${k.replace(/_/g, ' ')} debe ser un número entero`);
+    const [min, max] = LIMITES[k];
+    if (n < min || n > max) throw bad(`${k.replace(/_/g, ' ')} fuera del rango posible (${min}–${max}). Revisa el valor digitado.`);
+    out[k] = n;
   }
-
-  static async getById(req, res) {
-    try {
-      const { id } = req.params;
-      const signos = await SignosVitalesModel.findById(id);
-
-      if (!signos) {
-        return res.status(404).json({ error: 'Signos vitales no encontrados' });
-      }
-
-      res.json(signos);
-    } catch (error) {
-      console.error('Error al obtener signos vitales:', error);
-      res.status(500).json({ error: 'Error al obtener signos vitales' });
-    }
+  const medidas = Object.keys(LIMITES).filter((k) => out[k] !== null && out[k] !== undefined);
+  if (crear && !medidas.some((k) => !['peso', 'altura'].includes(k))) throw bad('Registra al menos un signo vital (presión, pulso, temperatura, saturación, respiración o glucosa)');
+  if ((out.presion_sistolica ?? null) !== null && (out.presion_diastolica ?? null) !== null && out.presion_sistolica <= out.presion_diastolica) {
+    throw bad('La presión sistólica debe ser mayor que la diastólica');
   }
-
-  static async getByPaciente(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const { fecha_inicio, fecha_fin } = req.query;
-
-      const filtros = {};
-      if (fecha_inicio) filtros.fecha_inicio = fecha_inicio;
-      if (fecha_fin) filtros.fecha_fin = fecha_fin;
-
-      const signos = await SignosVitalesModel.getByPaciente(pacienteId, filtros);
-
-      res.json(signos);
-    } catch (error) {
-      console.error('Error al obtener signos vitales del paciente:', error);
-      res.status(500).json({ error: 'Error al obtener signos vitales del paciente' });
-    }
-  }
-
-  static async getUltimos(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const { limite } = req.query;
-
-      const signos = await SignosVitalesModel.getUltimosPorPaciente(
-        pacienteId,
-        parseInt(limite) || 10
-      );
-
-      res.json(signos);
-    } catch (error) {
-      console.error('Error al obtener últimos signos vitales:', error);
-      res.status(500).json({ error: 'Error al obtener últimos signos vitales' });
-    }
-  }
-
-  static async getAlertas(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const alertas = await SignosVitalesModel.getAlertas(pacienteId);
-
-      res.json(alertas);
-    } catch (error) {
-      console.error('Error al obtener alertas:', error);
-      res.status(500).json({ error: 'Error al obtener alertas' });
-    }
-  }
-
-  static async getTendencias(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const { dias } = req.query;
-
-      const tendencias = await SignosVitalesModel.getTendencias(
-        pacienteId,
-        parseInt(dias) || 30
-      );
-
-      res.json(tendencias);
-    } catch (error) {
-      console.error('Error al obtener tendencias:', error);
-      res.status(500).json({ error: 'Error al obtener tendencias' });
-    }
-  }
-
-  static async update(req, res) {
-    try {
-      const { id } = req.params;
-      const datos = req.body;
-
-      const signos = await SignosVitalesModel.update(id, datos);
-
-      if (!signos) {
-        return res.status(404).json({ error: 'Signos vitales no encontrados' });
-      }
-
-      res.json({
-        message: 'Signos vitales actualizados exitosamente',
-        data: signos
-      });
-    } catch (error) {
-      console.error('Error al actualizar signos vitales:', error);
-      res.status(500).json({ error: 'Error al actualizar signos vitales' });
-    }
-  }
-
-  static async delete(req, res) {
-    try {
-      const { id } = req.params;
-      const signos = await SignosVitalesModel.delete(id);
-
-      if (!signos) {
-        return res.status(404).json({ error: 'Signos vitales no encontrados' });
-      }
-
-      res.json({
-        message: 'Signos vitales eliminados exitosamente',
-        data: signos
-      });
-    } catch (error) {
-      console.error('Error al eliminar signos vitales:', error);
-      res.status(500).json({ error: 'Error al eliminar signos vitales' });
-    }
-  }
+  if (crear && ((out.presion_sistolica ?? null) === null) !== ((out.presion_diastolica ?? null) === null)) throw bad('Registra presión sistólica y diastólica juntas');
+  return out;
 }
+
+const puedeModificar = (sv, user) => esGestorRol(user.rol) || (sv.usuario_id === user.id && Date.now() - Date.parse(sv.fecha_registro) < 24 * 3600 * 1000);
+
+export const SignosVitalesController = {
+  create: asyncHandler(async (req, res) => {
+    const pid = Number(req.body?.paciente_id);
+    if (!Number.isInteger(pid)) throw bad('Selecciona un residente');
+    const { rows } = await pool.query('SELECT id, activo FROM pacientes WHERE id = $1', [pid]);
+    if (!rows[0]) throw notFound('Residente no encontrado');
+    if (!rows[0].activo) throw bad('No se pueden registrar signos de un residente egresado');
+    const datos = limpiar(req.body, { crear: true });
+    const registro = await M.create(pid, req.user.id, datos);
+    const evaluacion = evaluarSignos(registro);
+    const estado = await recalcularEstado(pid, pool, req.user.id);
+    await auditar(req, { accion: 'crear', tabla: 'signos_vitales', registroId: registro.id, despues: { paciente_id: pid } });
+    res.status(201).json({ message: 'Signos vitales registrados', registro, alertas: evaluacion.hallazgos, nivel: evaluacion.nivel, estado });
+  }),
+
+  resumen: asyncHandler(async (_req, res) => {
+    const filas = await M.ultimosPorResidente();
+    res.json(filas.map((f) => ({ ...f, evaluacion: f.fecha_registro ? evaluarSignos(f) : null })));
+  }),
+
+  getById: asyncHandler(async (req, res) => {
+    const r = await M.findById(req.params.id);
+    if (!r) throw notFound('Registro no encontrado');
+    res.json({ ...r, evaluacion: evaluarSignos(r) });
+  }),
+
+  getByPaciente: asyncHandler(async (req, res) => {
+    const filas = await M.getByPaciente(req.params.pacienteId, req.query);
+    res.json(filas.map((f) => ({ ...f, evaluacion: evaluarSignos(f) })));
+  }),
+
+  getUltimos: asyncHandler(async (req, res) => {
+    const filas = await M.getByPaciente(req.params.pacienteId, { limit: Math.min(Number(req.query.limite) || 5, 50) });
+    res.json(filas.map((f) => ({ ...f, evaluacion: evaluarSignos(f) })));
+  }),
+
+  getAlertas: asyncHandler(async (req, res) => {
+    const filas = await M.getByPaciente(req.params.pacienteId, { limit: 60 });
+    res.json(filas.map((f) => ({ ...f, evaluacion: evaluarSignos(f) })).filter((f) => f.evaluacion.nivel > 0).slice(0, 20));
+  }),
+
+  getTendencias: asyncHandler(async (req, res) => {
+    const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
+    res.json(await M.tendencias(req.params.pacienteId, dias));
+  }),
+
+  update: asyncHandler(async (req, res) => {
+    const antes = await M.findById(req.params.id);
+    if (!antes) throw notFound('Registro no encontrado');
+    if (!puedeModificar(antes, req.user)) throw forbidden('Solo el autor (primeras 24 h) o un jefe/administrador puede corregir este registro');
+    const merged = { ...antes, ...limpiar(req.body, { crear: false }) };
+    limpiar(merged, { crear: true }); // valida coherencia del conjunto
+    const registro = await M.update(antes.id, limpiar(req.body, { crear: false }));
+    const estado = await recalcularEstado(antes.paciente_id, pool, req.user.id);
+    await auditar(req, { accion: 'actualizar', tabla: 'signos_vitales', registroId: antes.id, antes, despues: req.body });
+    res.json({ message: 'Registro actualizado', registro, estado });
+  }),
+
+  delete: asyncHandler(async (req, res) => {
+    const antes = await M.findById(req.params.id);
+    if (!antes) throw notFound('Registro no encontrado');
+    if (!puedeModificar(antes, req.user)) throw forbidden('No tienes permiso para eliminar este registro');
+    await M.delete(antes.id);
+    const estado = await recalcularEstado(antes.paciente_id, pool, req.user.id);
+    await auditar(req, { accion: 'eliminar', tabla: 'signos_vitales', registroId: antes.id, antes });
+    res.json({ message: 'Registro eliminado', estado });
+  }),
+};

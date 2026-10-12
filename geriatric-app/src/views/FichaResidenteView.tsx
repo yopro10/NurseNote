@@ -1,317 +1,155 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useToast } from '../context/ToastContext';
+import { api } from '../api/client';
 import { useApp } from '../context/AppContext';
-import Tabs from '../components/Tabs';
-import { IconoPacientes, IconoVitales, IconoMedicamentos, IconoNotas } from '../components/Icons';
-import SignosVitalesForm from '../components/SignosVitalesForm';
-import SignosVitalesGraficas from '../components/SignosVitalesGraficas';
+import { EstadoManualModal, NotaDetalleDrawer, NotaFormModal, ResidenteFormModal, SignosFormModal } from '../components/forms';
+import { HistorialAdministraciones, PrescripcionesLista } from '../components/medicacion';
+import SignosGrafica from '../components/SignosGrafica';
+import { IconoAlerta, IconoMas } from '../components/Icons';
+import { Avatar, Cargando, Confirmar, Dl, ErrorBox, EstadoBadge, ExportarBotones, Paginacion, Tabs, Vacio, useCarga } from '../components/ui';
+import type { HistorialEstado, Nota, Paciente, Paginado, SignosVitales } from '../types';
+import { calcularEdad, fmtFecha, fmtFechaHora, hace, nombreCompleto, TIPOS_NOTA } from '../utils/format';
+import { evaluarSignos, nivelDe } from '../utils/rangos';
 
-interface PacienteDetalle {
-  id: number;
-  nombre: string;
-  apellido: string;
-  fecha_nacimiento: string;
-  genero: string;
-  habitacion: string;
-  alergias: string;
-  enfermedades_cronicas: string;
-  contacto_emergencia: string;
-  telefono_emergencia: string;
-  fecha_ingreso: string;
-  estado_calculado: string;
-}
+type Tab = 'resumen' | 'notas' | 'signos' | 'medicacion' | 'estado';
 
 export default function FichaResidenteView() {
-  const { pacienteSeleccionado, usuarioActual } = useApp();
-  const [paciente, setPaciente] = useState<PacienteDetalle | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [signosRecientes, setSignosRecientes] = useState<any[]>([]);
-  const [alertasSignos, setAlertasSignos] = useState<any[]>([]);
+  const { destino, ir, esGestor, usuario, tick, refrescar } = useApp();
+  const id = destino.pacienteId ?? 0;
+  const [tab, setTab] = useState<Tab>((destino.tab as Tab) ?? 'resumen');
+  const [modal, setModal] = useState<null | 'nota' | 'signos' | 'editar' | 'estado'>(null);
+  const [version, setVersion] = useState(0);
+  const bump = () => { setVersion((v) => v + 1); refrescar(); };
+  const p = useCarga(() => api.get<Paciente>(`/pacientes/${id}`), [id, tick, version]);
 
-  useEffect(() => {
-    if (pacienteSeleccionado) {
-      cargarPacienteDetalle(pacienteSeleccionado.id);
-      cargarSignosVitales(pacienteSeleccionado.id);
-      cargarAlertas(pacienteSeleccionado.id);
-    }
-  }, [pacienteSeleccionado]);
-
-  const cargarPacienteDetalle = async (id: number) => {
-    try {
-      const response = await fetch(`http://localhost:3000/api/pacientes/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      const data = await response.json();
-      setPaciente(data);
-    } catch (error) {
-      console.error('Error al cargar paciente:', error);
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  const cargarSignosVitales = async (id: number) => {
-    try {
-      const response = await fetch(`http://localhost:3000/api/signos-vitales/paciente/${id}/ultimos?limite=5`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      const data = await response.json();
-      setSignosRecientes(data);
-    } catch (error) {
-      console.error('Error al cargar signos vitales:', error);
-    }
-  };
-
-  const cargarAlertas = async (id: number) => {
-    try {
-      const response = await fetch(`http://localhost:3000/api/signos-vitales/paciente/${id}/alertas`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      const data = await response.json();
-      setAlertasSignos(data);
-    } catch (error) {
-      console.error('Error al cargar alertas:', error);
-    }
-  };
-
-  const handleGuardarSignos = async ({ datos, alertas }: { datos: any; alertas: string[] }) => {
-    try {
-      const response = await fetch('http://localhost:3000/api/signos-vitales', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(datos)
-      });
-
-      const result = await response.json();
-      alert('Signos vitales registrados exitosamente');
-      cargarSignosVitales(pacienteSeleccionado.id);
-      cargarAlertas(pacienteSeleccionado.id);
-    } catch (error) {
-      console.error('Error al guardar signos vitales:', error);
-      alert('Error al registrar signos vitales');
-    }
-  };
-
-  if (cargando) {
-    return (
-      <div className="cargando-bloque">
-        <div className="spinner"></div>
-        <p>Cargando ficha del residente...</p>
-      </div>
-    );
-  }
-
-  if (!paciente) {
-    return (
-      <div className="cargando-bloque">
-        <p>No hay residente seleccionado</p>
-      </div>
-    );
-  }
-
-  const calcularEdad = (fechaNacimiento: string) => {
-    const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
-    const edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mes = hoy.getMonth() - nacimiento.getMonth();
-    return mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate()) ? edad - 1 : edad;
-  };
-
-  const tabs = [
-    {
-      id: 'resumen',
-      label: 'Resumen',
-      content: (
-        <div className="ficha-resumen">
-          <div className="ficha-resumen__encabezado">
-            <div className="ficha-resumen__info">
-              <h2>{paciente.nombre} {paciente.apellido}</h2>
-              <p>Habitación {paciente.habitacion} · {calcularEdad(paciente.fecha_nacimiento)} años</p>
-              <span className={`badge badge--${paciente.estado_calculado === 'Crítico' ? 'rojo' : paciente.estado_calculado === 'En Observación' ? 'ambar' : 'verde'}`}>
-                {paciente.estado_calculado}
-              </span>
-            </div>
-          </div>
-
-          <div className="ficha-resumen__secciones">
-            <div className="ficha-seccion">
-              <h3>Información Personal</h3>
-              <div className="ficha-seccion__contenido">
-                <div className="dato-item">
-                  <span className="dato-item__label">Fecha de nacimiento:</span>
-                  <span className="dato-item__valor">{new Date(paciente.fecha_nacimiento).toLocaleDateString('es-ES')}</span>
-                </div>
-                <div className="dato-item">
-                  <span className="dato-item__label">Género:</span>
-                  <span className="dato-item__valor">{paciente.genero}</span>
-                </div>
-                <div className="dato-item">
-                  <span className="dato-item__label">Fecha de ingreso:</span>
-                  <span className="dato-item__valor">{new Date(paciente.fecha_ingreso).toLocaleDateString('es-ES')}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="ficha-seccion">
-              <h3>Salud</h3>
-              <div className="ficha-seccion__contenido">
-                <div className="dato-item">
-                  <span className="dato-item__label">Alergias:</span>
-                  <span className="dato-item__valor dato-item__valor--alergia">
-                    {paciente.alergias || 'Ninguna conocida'}
-                  </span>
-                </div>
-                <div className="dato-item">
-                  <span className="dato-item__label">Enfermedades crónicas:</span>
-                  <span className="dato-item__valor">{paciente.enfermedades_cronicas || 'Ninguna'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="ficha-seccion">
-              <h3>Contacto de Emergencia</h3>
-              <div className="ficha-seccion__contenido">
-                <div className="dato-item">
-                  <span className="dato-item__label">Nombre:</span>
-                  <span className="dato-item__valor">{paciente.contacto_emergencia}</span>
-                </div>
-                <div className="dato-item">
-                  <span className="dato-item__label">Teléfono:</span>
-                  <span className="dato-item__valor">{paciente.telefono_emergencia}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'notas',
-      label: 'Notas',
-      content: (
-        <div className="ficha-contenido">
-          <div className="ficha-contenido__header">
-            <h3>Notas de Enfermería</h3>
-            <p>Historial de notas y evoluciones</p>
-          </div>
-          <div className="alerta alerta--info">
-            <p>Las notas más recientes se cargarán aquí.</p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'signos',
-      label: 'Signos Vitales',
-      content: (
-        <div className="ficha-contenido">
-          <div className="ficha-contenido__header">
-            <h3>Signos Vitales</h3>
-            <p>Registro de signos vitales con alertas automáticas</p>
-          </div>
-
-          {alertasSignos.length > 0 && (
-            <div className="alerta alerta--error">
-              <h4>⚠️ Alertas Activas:</h4>
-              <ul>
-                {alertasSignos.map((alerta: any, index: number) => (
-                  <li key={index}>{alerta.estado_alerta}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="signos-vitales-section">
-            <h4>Registrar Signos Vitales</h4>
-            <SignosVitalesForm
-              pacienteId={paciente.id}
-              onGuardar={handleGuardarSignos}
-            />
-          </div>
-
-          {signosRecientes.length > 0 && (
-            <div className="signos-vitales-section">
-              <h4>Registros Recientes</h4>
-              <div className="signos-historial">
-                {signosRecientes.map((signo: any) => (
-                  <div key={signo.id} className="signo-item">
-                    <div className="signo-item__fecha">
-                      {new Date(signo.fecha_registro).toLocaleString('es-ES')}
-                    </div>
-                    <div className="signo-item__datos">
-                      <span>PA: {signo.presion_sistolica}/{signo.presion_diastolica} mmHg</span>
-                      <span>FC: {signo.frecuencia_cardiaca} lpm</span>
-                      <span>Temp: {signo.temperatura}°C</span>
-                      <span>SpO₂: {signo.saturacion_oxigeno}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <SignosVitalesGraficas pacienteId={paciente.id} />
-        </div>
-      )
-    },
-    {
-      id: 'medicamentos',
-      label: 'Medicamentos',
-      content: (
-        <div className="ficha-contenido">
-          <div className="ficha-contenido__header">
-            <h3>Medicamentos Asignados</h3>
-            <p>Prescripciones y administraciones</p>
-          </div>
-          <div className="alerta alerta--info">
-            <p>El sistema de medicación se implementará aquí.</p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'contactos',
-      label: 'Contactos',
-      content: (
-        <div className="ficha-contenido">
-          <div className="ficha-contenido__header">
-            <h3>Información de Contacto</h3>
-            <p>Información completa del residente y familiares</p>
-          </div>
-          <div className="ficha-seccion">
-            <h3>Contacto de Emergencia</h3>
-            <div className="ficha-seccion__contenido">
-              <div className="dato-item">
-                <span className="dato-item__label">Nombre:</span>
-                <span className="dato-item__valor">{paciente.contacto_emergencia}</span>
-              </div>
-              <div className="dato-item">
-                <span className="dato-item__label">Teléfono:</span>
-                <span className="dato-item__valor">{paciente.telefono_emergencia}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    }
-  ];
+  if (!id) return <Vacio icono="🧑‍⚕️" texto="Selecciona un residente para ver su ficha." accion={<button className="btn btn--p" onClick={() => ir('residentes')}>Ir a residentes</button>} />;
+  if (p.cargando && !p.datos) return <Cargando texto="Cargando ficha…" />;
+  if (p.error || !p.datos) return <ErrorBox mensaje={p.error ?? 'No se encontró el residente'} onReintentar={p.recargar} />;
+  const r = p.datos;
+  const tieneAlergia = r.alergias && !/^ning/i.test(r.alergias);
 
   return (
-    <div className="ficha-residente">
-      <div className="pagina-cabecera">
-        <h2>Ficha del Residente</h2>
-        <p>Información completa y seguimiento del residente</p>
+    <>
+      <div className="card" style={{ borderLeft: `5px solid ${r.estado_calculado === 'Crítico' ? 'var(--rojo)' : r.estado_calculado === 'En Observación' ? 'var(--ambar)' : 'var(--verde)'}` }}>
+        <div className="barra">
+          <button className="btn btn--sm btn--g" onClick={() => ir('residentes')}>← Residentes</button>
+          <Avatar nombre={r.nombre} apellido={r.apellido} id={r.id} lg />
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <h2>{nombreCompleto(r)} {!r.activo && <span className="badge badge--muted">Egresado</span>}</h2>
+            <small>Hab. {r.habitacion ?? '—'} · {calcularEdad(r.fecha_nacimiento) ?? '—'} años · Doc. {r.documento ?? '—'} · Ingreso {fmtFecha(r.fecha_ingreso)}</small>
+            <div className="chips" style={{ marginTop: 4 }}><EstadoBadge estado={r.activo ? r.estado_calculado : 'Egresado'} />
+              {tieneAlergia ? <span className="badge badge--crit"><IconoAlerta size={11} /> Alergias: {r.alergias}</span> : null}
+              {r.estado_motivo && r.activo ? <small>{r.estado_motivo}</small> : null}</div>
+          </div>
+          <div className="barra">
+            {r.activo && <button className="btn btn--sm btn--p" onClick={() => setModal('nota')}><IconoMas size={13} /> Nota</button>}
+            {r.activo && <button className="btn btn--sm" onClick={() => setModal('signos')}><IconoMas size={13} /> Signos</button>}
+            {esGestor && r.activo && <button className="btn btn--sm" onClick={() => setModal('estado')}>Ajustar estado</button>}
+            {esGestor && <button className="btn btn--sm" onClick={() => setModal('editar')}>Editar</button>}
+            <ExportarBotones tipo="ficha" params={{ paciente_id: r.id }} etiqueta="Exportar ficha" />
+          </div>
+        </div>
       </div>
 
-      <Tabs tabs={tabs} defaultTab="resumen" />
+      <Tabs valor={tab} onChange={setTab} tabs={[{ id: 'resumen', label: 'Resumen' }, { id: 'notas', label: 'Notas' }, { id: 'signos', label: 'Signos vitales' }, { id: 'medicacion', label: 'Medicación' }, { id: 'estado', label: 'Historial de estado' }]} />
+
+      {tab === 'resumen' && <Resumen r={r} version={version} irTab={setTab} />}
+      {tab === 'notas' && <NotasTab id={id} version={version} activo={r.activo} onNueva={() => setModal('nota')} />}
+      {tab === 'signos' && <SignosTab id={id} version={version} activo={r.activo} onNuevo={() => setModal('signos')} onCambio={bump} usuarioId={usuario?.id ?? 0} esGestor={esGestor} />}
+      {tab === 'medicacion' && <><PrescripcionesLista pacienteId={id} /><HistorialAdministraciones pacienteId={id} /></>}
+      {tab === 'estado' && <HistorialTab id={id} version={version} />}
+
+      {modal === 'nota' && <NotaFormModal pacienteId={id} onClose={() => setModal(null)} onGuardado={bump} />}
+      {modal === 'signos' && <SignosFormModal pacienteId={id} onClose={() => setModal(null)} onGuardado={bump} />}
+      {modal === 'editar' && <ResidenteFormModal paciente={r} onClose={() => setModal(null)} onGuardado={bump} />}
+      {modal === 'estado' && <EstadoManualModal paciente={r} onClose={() => setModal(null)} onGuardado={bump} />}
+    </>
+  );
+}
+
+function Resumen({ r, version, irTab }: { r: Paciente; version: number; irTab: (t: Tab) => void }) {
+  const ult = useCarga(() => api.get<SignosVitales[]>(`/signos-vitales/paciente/${r.id}/ultimos`, { limite: 1 }), [r.id, version]);
+  const sv = ult.datos?.[0];
+  const ev = sv ? evaluarSignos(sv) : null;
+  const cel = (l: string, campo: string, val: unknown, u: string) => {
+    const n = sv ? nivelDe(sv, campo) : 0;
+    return <div className={`signo ${n === 2 ? 'signo--crit' : n === 1 ? 'signo--warn' : ''}`}><small>{l}</small><b>{String(val ?? '—')}</b> <small style={{ display: 'inline' }}>{val != null ? u : ''}</small></div>;
+  };
+  return (
+    <div className="grid2">
+      <div className="card"><div className="card__t"><h3>Datos del residente</h3></div>
+        <Dl filas={[['Nacimiento', `${fmtFecha(r.fecha_nacimiento)} (${calcularEdad(r.fecha_nacimiento) ?? '—'} años)`], ['Género', r.genero], ['Teléfono', r.telefono], ['Dirección', r.direccion],
+          ['Alergias', r.alergias || 'Ninguna conocida'], ['Enfermedades crónicas', r.enfermedades_cronicas || 'Ninguna registrada'],
+          ['Contacto de emergencia', [r.contacto_emergencia, r.telefono_emergencia].filter(Boolean).join(' · ') || '—'], ...(r.activo ? [] : [['Egreso', `${fmtFecha(r.fecha_egreso)} · ${r.motivo_egreso ?? ''}`] as [string, string]])]} /></div>
+      <div className="card"><div className="card__t"><h3>Último registro de signos</h3><button className="btn btn--sm" onClick={() => irTab('signos')}>Ver todos</button></div>
+        {ult.cargando && !sv ? <Cargando /> : !sv ? <Vacio icono="🩺" texto="Aún no hay signos vitales registrados." /> : <>
+          <small>{fmtFechaHora(sv.fecha_registro)} · {hace(sv.fecha_registro)} · por {sv.usuario_nombre}</small>
+          <div className="signos-grid" style={{ marginTop: 6 }}>
+            {cel('PA', 'presion_sistolica', sv.presion_sistolica ? `${sv.presion_sistolica}/${sv.presion_diastolica}` : null, 'mmHg')}
+            {cel('Frec. cardíaca', 'frecuencia_cardiaca', sv.frecuencia_cardiaca, 'lpm')}{cel('Temperatura', 'temperatura', sv.temperatura, '°C')}
+            {cel('SpO₂', 'saturacion_oxigeno', sv.saturacion_oxigeno, '%')}{cel('Frec. resp.', 'frecuencia_respiratoria', sv.frecuencia_respiratoria, 'rpm')}{cel('Glucosa', 'glucosa', sv.glucosa, 'mg/dL')}</div>
+          {ev && ev.nivel > 0 && <div className={`alerta ${ev.nivel === 2 ? 'alerta--error' : 'alerta--warn'}`} style={{ marginTop: 8 }}><IconoAlerta size={16} /><ul>{ev.hallazgos.map((h) => <li key={h.campo}>{h.texto}</li>)}</ul></div>}</>}
+      </div>
+    </div>
+  );
+}
+
+function NotasTab({ id, version, activo, onNueva }: { id: number; version: number; activo: boolean; onNueva: () => void }) {
+  const [page, setPage] = useState(1);
+  const [ver, setVer] = useState<number | null>(null);
+  const [n, setN] = useState(0);
+  const { datos, cargando, error, recargar } = useCarga(() => api.get<Paginado<Nota>>('/notas', { paciente_id: id, page, limit: 8 }), [id, page, version, n]);
+  return (
+    <div className="card">
+      <div className="card__t"><h3>Notas de enfermería</h3><span className="barra"><ExportarBotones tipo="notas" params={{ paciente_id: id, desde: '2000-01-01' }} />{activo && <button className="btn btn--sm btn--p" onClick={onNueva}><IconoMas size={13} /> Nueva nota</button>}</span></div>
+      {cargando && !datos && <Cargando />}{error && <ErrorBox mensaje={error} onReintentar={recargar} />}
+      {datos && !datos.data.length && <Vacio icono="📝" texto="Este residente aún no tiene notas." />}
+      {datos && datos.data.length > 0 && <>
+        <ul className="lista">{datos.data.map((x) => (
+          <li key={x.id}><button className="fila" onClick={() => setVer(x.id)}>
+            <div><strong>{TIPOS_NOTA[x.tipo_nota]} · {fmtFechaHora(x.fecha_registro)}</strong><small className="clamp2">{x.contenido}</small><small>Por {x.usuario_nombre} {x.usuario_apellido ?? ''}</small></div>
+            <span className="badge badge--info">Ver</span></button></li>))}</ul>
+        <Paginacion page={datos.page} paginas={datos.paginas} total={datos.total} onChange={setPage} /></>}
+      {ver && <NotaDetalleDrawer id={ver} onClose={() => setVer(null)} onCambio={() => setN((x) => x + 1)} />}
+    </div>
+  );
+}
+
+function SignosTab({ id, version, activo, onNuevo, onCambio, usuarioId, esGestor }: { id: number; version: number; activo: boolean; onNuevo: () => void; onCambio: () => void; usuarioId: number; esGestor: boolean }) {
+  const toast = useToast();
+  const { datos, cargando, error, recargar } = useCarga(() => api.get<SignosVitales[]>(`/signos-vitales/paciente/${id}`, { limit: 30 }), [id, version]);
+  const [borrar, setBorrar] = useState<SignosVitales | null>(null);
+  const puede = (s: SignosVitales) => esGestor || (s.usuario_id === usuarioId && Date.now() - (Date.parse(s.fecha_registro) || 0) < 24 * 3600 * 1000);
+  return (
+    <>
+      <SignosGrafica pacienteId={id} version={version} />
+      <div className="card">
+        <div className="card__t"><h3>Registros recientes</h3><span className="barra"><ExportarBotones tipo="signos" params={{ paciente_id: id, desde: '2000-01-01' }} />{activo && <button className="btn btn--sm btn--p" onClick={onNuevo}><IconoMas size={13} /> Registrar signos</button>}</span></div>
+        {cargando && !datos && <Cargando />}{error && <ErrorBox mensaje={error} onReintentar={recargar} />}
+        {datos && !datos.length && <Vacio icono="🩺" texto="Sin registros de signos vitales." />}
+        {datos && datos.length > 0 && <div className="tabla-wrap"><table className="tabla"><thead><tr><th>Fecha</th><th>PA</th><th>FC</th><th>Temp</th><th>SpO₂</th><th>FR</th><th>Glucosa</th><th>Alertas</th><th /></tr></thead>
+          <tbody>{datos.map((s) => { const ev = s.evaluacion ?? evaluarSignos(s); return (
+            <tr key={s.id} className={ev.nivel === 2 ? 'fila--crit' : ev.nivel === 1 ? 'fila--warn' : ''}>
+              <td>{fmtFechaHora(s.fecha_registro)}<small>{s.usuario_nombre}</small></td><td>{s.presion_sistolica ? `${s.presion_sistolica}/${s.presion_diastolica}` : '—'}</td><td>{s.frecuencia_cardiaca ?? '—'}</td>
+              <td>{s.temperatura ?? '—'}</td><td>{s.saturacion_oxigeno ?? '—'}</td><td>{s.frecuencia_respiratoria ?? '—'}</td><td>{s.glucosa ?? '—'}</td>
+              <td>{ev.nivel === 0 ? <span className="badge badge--ok">Normal</span> : <small>{ev.hallazgos.map((h) => h.texto).join(' · ')}</small>}</td>
+              <td className="acc">{puede(s) && <button className="btn btn--sm btn--g" onClick={() => setBorrar(s)}>Eliminar</button>}</td></tr>); })}</tbody></table></div>}
+      </div>
+      {borrar && <Confirmar titulo="Eliminar registro" peligro textoAceptar="Eliminar" mensaje={`¿Eliminar el registro de ${fmtFechaHora(borrar.fecha_registro)}? El estado del residente se recalculará.`} onCancelar={() => setBorrar(null)}
+        onAceptar={async () => { await api.del(`/signos-vitales/${borrar.id}`); toast('Registro eliminado', 'success'); setBorrar(null); onCambio(); recargar(); }} />}
+    </>
+  );
+}
+
+function HistorialTab({ id, version }: { id: number; version: number }) {
+  const { datos, cargando, error, recargar } = useCarga(() => api.get<HistorialEstado[]>(`/pacientes/${id}/estado/historial`), [id, version]);
+  return (
+    <div className="card"><div className="card__t"><h3>Historial de estado</h3><small>Cada cambio, con su origen y motivo</small></div>
+      {cargando && !datos && <Cargando />}{error && <ErrorBox mensaje={error} onReintentar={recargar} />}
+      {datos && !datos.length && <Vacio texto="Sin cambios de estado registrados." />}
+      {datos && datos.length > 0 && <ul className="tl">{datos.map((h) => (
+        <li key={h.id}><div className="barra"><b>{h.estado_anterior ? `${h.estado_anterior} → ` : ''}{h.estado_nuevo}</b><span className={`badge ${h.origen === 'manual' ? 'badge--mor' : 'badge--info'}`}>{h.origen === 'manual' ? 'Ajuste manual' : 'Automático'}</span></div>
+          <small>{fmtFechaHora(h.fecha)}{h.usuario_nombre ? ` · ${h.usuario_nombre} ${h.usuario_apellido ?? ''}` : ''}</small><p style={{ fontSize: '.88rem' }}>{h.motivo}</p></li>))}</ul>}
     </div>
   );
 }

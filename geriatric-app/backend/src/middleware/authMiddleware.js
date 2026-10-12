@@ -1,41 +1,42 @@
 import jwt from 'jsonwebtoken';
+import pool from '../config/database.js';
+import { env } from '../config/env.js';
+import { asyncHandler, HttpError } from '../utils/http.js';
 
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+export const ROLES = { ADMIN: 'administrador', JEFE: 'jefe_enfermeria', ENF: 'enfermera' };
 
-  if (!token) {
-    return res.status(401).json({ error: 'Token de autenticación requerido' });
+export const authenticateToken = asyncHandler(async (req, _res, next) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) throw new HttpError(401, 'Token de autenticación requerido');
+
+  let payload;
+  try {
+    payload = jwt.verify(token, env.JWT_SECRET);
+  } catch {
+    throw new HttpError(401, 'Sesión expirada o token inválido');
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Token inválido o expirado' });
-    }
+  // Se consulta la BD para que una cuenta desactivada o un cambio de rol surtan efecto de inmediato.
+  const { rows } = await pool.query(
+    'SELECT id, nombre, apellido, email, rol, activo FROM usuarios WHERE id = $1',
+    [payload.id]
+  );
+  const usuario = rows[0];
+  if (!usuario || !usuario.activo) throw new HttpError(401, 'La cuenta no existe o está desactivada');
+  req.user = { id: usuario.id, nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, rol: usuario.rol };
+  next();
+});
 
-    req.user = user;
-    next();
-  });
+export const authorizeRoles = (...roles) => (req, _res, next) => {
+  if (!req.user) return next(new HttpError(401, 'Usuario no autenticado'));
+  if (!roles.includes(req.user.rol)) {
+    return next(new HttpError(403, 'No tienes permiso para realizar esta acción', { rolRequerido: roles }));
+  }
+  next();
 };
 
-export const authorizeRoles = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Usuario no autenticado' });
-    }
-
-    if (!roles.includes(req.user.rol)) {
-      return res.status(403).json({ 
-        error: 'No tienes permiso para acceder a este recurso',
-        requiredRoles: roles,
-        userRole: req.user.rol
-      });
-    }
-
-    next();
-  };
-};
-
-export const isAdmin = authorizeRoles('administrador');
-export const isEnfermeraOrAdmin = authorizeRoles('enfermera', 'administrador', 'jefe_enfermeria');
-export const isJefeEnfermeriaOrAdmin = authorizeRoles('jefe_enfermeria', 'administrador');
+export const isAdmin = authorizeRoles(ROLES.ADMIN);
+export const isGestor = authorizeRoles(ROLES.ADMIN, ROLES.JEFE); // administrador o jefe de enfermería
+export const isPersonal = authorizeRoles(ROLES.ADMIN, ROLES.JEFE, ROLES.ENF);
+export const esGestorRol = (rol) => rol === ROLES.ADMIN || rol === ROLES.JEFE;

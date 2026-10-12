@@ -9,14 +9,10 @@ import { executeSQLFile } from './sqlParser.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configuración de conexión PostgreSQL
-const config = {
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'yopro1015',
-  database: 'postgres' // Conectar a postgres por defecto para crear la BD
-};
+import { env } from '../src/config/env.js';
+import { createTestMedicamentos, createTestNotas, seedClinico } from './seedData.js';
+
+const config = { host: env.db.host, port: env.db.port, user: env.db.user, password: env.db.password, database: 'postgres' };
 
 async function initializeDatabase() {
   const client = new Client(config);
@@ -28,12 +24,12 @@ async function initializeDatabase() {
 
     // Verificar si la base de datos existe
     const dbCheckResult = await client.query(
-      "SELECT 1 FROM pg_database WHERE datname = 'geriatric_app'"
+      `SELECT 1 FROM pg_database WHERE datname = '${env.db.database}'`
     );
 
     if (dbCheckResult.rows.length === 0) {
       console.log('📦 Creando base de datos geriatric_app...');
-      await client.query('CREATE DATABASE geriatric_app');
+      await client.query(`CREATE DATABASE ${env.db.database}`);
       console.log('✅ Base de datos creada exitosamente');
     } else {
       console.log('ℹ️  La base de datos geriatric_app ya existe');
@@ -43,7 +39,7 @@ async function initializeDatabase() {
     await client.end();
 
     // Conectar a la base de datos geriatric_app
-    const dbConfig = { ...config, database: 'geriatric_app' };
+    const dbConfig = { ...config, database: env.db.database };
     const dbClient = new Client(dbConfig);
     await dbClient.connect();
     console.log('✅ Conectado a base de datos geriatric_app');
@@ -115,6 +111,8 @@ async function initializeDatabase() {
     } else {
       console.log('ℹ️  Las notas ya existen, omitiendo creación');
     }
+
+    await seedClinico(dbClient);
 
     await dbClient.end();
     console.log('🎉 Inicialización de base de datos completada exitosamente');
@@ -585,332 +583,6 @@ async function createTestPatients(client) {
     );
   }
   console.log(`✅ ${patients.length} pacientes de prueba creados`);
-}
-
-async function createTestMedicamentos(client) {
-  const medicamentos = [
-    {
-      nombre: 'Paracetamol 500mg',
-      descripcion: 'Analgésico y antipirético',
-      presentacion: 'Tabletas',
-      dosis: '500mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 100,
-      fecha_caducidad: '2025-12-31',
-      lote: 'PAR001',
-      proveedor: 'Laboratorios ABC'
-    },
-    {
-      nombre: 'Ibuprofeno 400mg',
-      descripcion: 'Antiinflamatorio no esteroideo',
-      presentacion: 'Cápsulas',
-      dosis: '400mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 75,
-      fecha_caducidad: '2025-08-15',
-      lote: 'IBU002',
-      proveedor: 'Laboratorios XYZ'
-    },
-    {
-      nombre: 'Insulina Glargina',
-      descripcion: 'Insulina de acción larga para diabetes',
-      presentacion: 'Pluma inyectable',
-      dosis: '100 UI/mL',
-      via_administracion: 'Subcutánea',
-      cantidad_disponible: 20,
-      fecha_caducidad: '2025-06-30',
-      lote: 'INS003',
-      proveedor: 'Pharma Corp'
-    },
-    {
-      nombre: 'Enalapril 10mg',
-      descripcion: 'Inhibidor de la ECA para hipertensión',
-      presentacion: 'Tabletas',
-      dosis: '10mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 50,
-      fecha_caducidad: '2025-10-20',
-      lote: 'ENA004',
-      proveedor: 'Laboratorios ABC'
-    },
-    {
-      nombre: 'Metformina 850mg',
-      descripcion: 'Antidiabético oral',
-      presentacion: 'Tabletas',
-      dosis: '850mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 80,
-      fecha_caducidad: '2025-11-10',
-      lote: 'MET005',
-      proveedor: 'Diabetes Care'
-    },
-    {
-      nombre: 'Omeprazol 20mg',
-      descripcion: 'Inhibidor de la bomba de protones',
-      presentacion: 'Cápsulas',
-      dosis: '20mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 60,
-      fecha_caducidad: '2025-09-25',
-      lote: 'OME006',
-      proveedor: 'Gastro Pharma'
-    },
-    {
-      nombre: 'Amlodipino 5mg',
-      descripcion: 'Bloqueante de los canales de calcio',
-      presentacion: 'Tabletas',
-      dosis: '5mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 45,
-      fecha_caducidad: '2025-07-15',
-      lote: 'AML007',
-      proveedor: 'CardioMed'
-    },
-    {
-      nombre: 'Levotiroxina 50mcg',
-      descripcion: 'Hormona tiroidea sintética',
-      presentacion: 'Tabletas',
-      dosis: '50mcg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 30,
-      fecha_caducidad: '2025-12-01',
-      lote: 'LEV008',
-      proveedor: 'Endo Pharma'
-    },
-    {
-      nombre: 'Losartán 50mg',
-      descripcion: 'Antagonista de los receptores de angiotensina II',
-      presentacion: 'Tabletas',
-      dosis: '50mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 65,
-      fecha_caducidad: '2026-01-15',
-      lote: 'LOS009',
-      proveedor: 'Hypertension Labs'
-    },
-    {
-      nombre: 'Atorvastatina 20mg',
-      descripcion: 'Estatina para reducir colesterol',
-      presentacion: 'Tabletas',
-      dosis: '20mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 55,
-      fecha_caducidad: '2025-11-30',
-      lote: 'ATO010',
-      proveedor: 'CardioCare'
-    },
-    {
-      nombre: 'Warfarina 5mg',
-      descripcion: 'Anticoagulante oral',
-      presentacion: 'Tabletas',
-      dosis: '5mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 25,
-      fecha_caducidad: '2025-08-20',
-      lote: 'WAR011',
-      proveedor: 'Coagulation Pharma'
-    },
-    {
-      nombre: 'Furosemida 40mg',
-      descripcion: 'Diurético de asa',
-      presentacion: 'Tabletas',
-      dosis: '40mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 70,
-      fecha_caducidad: '2025-10-05',
-      lote: 'FUR012',
-      proveedor: 'Diuretic Solutions'
-    },
-    {
-      nombre: 'Digoxina 0.25mg',
-      descripcion: 'Glicósido cardíaco',
-      presentacion: 'Tabletas',
-      dosis: '0.25mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 35,
-      fecha_caducidad: '2025-09-10',
-      lote: 'DIG013',
-      proveedor: 'Heart Pharma'
-    },
-    {
-      nombre: 'Diazepam 5mg',
-      descripcion: 'Benzodiazepina ansiolítica',
-      presentacion: 'Tabletas',
-      dosis: '5mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 40,
-      fecha_caducidad: '2026-02-28',
-      lote: 'DIA014',
-      proveedor: 'Calm Labs'
-    },
-    {
-      nombre: 'Donepezilo 10mg',
-      descripcion: 'Inhibidor de la colinesterasa para Alzheimer',
-      presentacion: 'Tabletas',
-      dosis: '10mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 28,
-      fecha_caducidad: '2025-12-15',
-      lote: 'DON015',
-      proveedor: 'NeuroCare'
-    },
-    {
-      nombre: 'Risperidona 1mg',
-      descripcion: 'Antipsicótico atípico',
-      presentacion: 'Tabletas',
-      dosis: '1mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 32,
-      fecha_caducidad: '2025-11-25',
-      lote: 'RIS016',
-      proveedor: 'PsychMed'
-    },
-    {
-      nombre: 'Pramipexol 0.25mg',
-      descripcion: 'Agonista dopaminérgico para Parkinson',
-      presentacion: 'Tabletas',
-      dosis: '0.25mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 38,
-      fecha_caducidad: '2026-01-20',
-      lote: 'PRA017',
-      proveedor: 'Movement Labs'
-    },
-    {
-      nombre: 'Alendronato 70mg',
-      descripcion: 'Bisfosfonato para osteoporosis',
-      presentacion: 'Tabletas',
-      dosis: '70mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 22,
-      fecha_caducidad: '2025-10-30',
-      lote: 'ALE018',
-      proveedor: 'Bone Health'
-    },
-    {
-      nombre: 'Citalopram 20mg',
-      descripcion: 'ISRS antidepresivo',
-      presentacion: 'Tabletas',
-      dosis: '20mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 48,
-      fecha_caducidad: '2026-03-10',
-      lote: 'CIT019',
-      proveedor: 'Mental Health Pharma'
-    },
-    {
-      nombre: 'Clopidogrel 75mg',
-      descripcion: 'Antiagregante plaquetario',
-      presentacion: 'Tabletas',
-      dosis: '75mg',
-      via_administracion: 'Oral',
-      cantidad_disponible: 52,
-      fecha_caducidad: '2025-12-20',
-      lote: 'CLO020',
-      proveedor: 'Thrombosis Care'
-    }
-  ];
-
-  for (const med of medicamentos) {
-    await client.query(
-      `INSERT INTO medicamentos 
-       (nombre, descripcion, presentacion, dosis, via_administracion, 
-        cantidad_disponible, fecha_caducidad, lote, proveedor)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        med.nombre, med.descripcion, med.presentacion, med.dosis,
-        med.via_administracion, med.cantidad_disponible, med.fecha_caducidad,
-        med.lote, med.proveedor
-      ]
-    );
-  }
-  console.log(`✅ ${medicamentos.length} medicamentos de prueba creados`);
-}
-
-async function createTestNotas(client) {
-  // Obtener IDs de usuarios y pacientes para crear notas realistas
-  const usuariosResult = await client.query('SELECT id FROM usuarios WHERE rol != \'administrador\' LIMIT 10');
-  const pacientesResult = await client.query('SELECT id FROM pacientes LIMIT 15');
-
-  const usuarios = usuariosResult.rows;
-  const pacientes = pacientesResult.rows;
-
-  const tiposNota = ['ingreso', 'evolucion', 'medicacion', 'signos_vitales', 'observacion'];
-  const estadosPaciente = ['Estable', 'Observación', 'Mejorando', 'Estable pero monitoreo'];
-
-  const notas = [];
-
-  // Crear notas para cada paciente
-  for (let i = 0; i < pacientes.length; i++) {
-    const pacienteId = pacientes[i].id;
-    const numNotas = Math.floor(Math.random() * 5) + 3; // 3-7 notas por paciente
-
-    for (let j = 0; j < numNotas; j++) {
-      const usuarioId = usuarios[Math.floor(Math.random() * usuarios.length)].id;
-      const tipoNota = tiposNota[Math.floor(Math.random() * tiposNota.length)];
-      const estado = estadosPaciente[Math.floor(Math.random() * estadosPaciente.length)];
-
-      let contenido = '';
-      let signosVitales = null;
-      let administracionMedicamentos = null;
-
-      switch (tipoNota) {
-        case 'ingreso':
-          contenido = 'Paciente ingresado al hogar geriátrico. Evaluación inicial completada. Estable generalmente.';
-          break;
-        case 'evolucion':
-          contenido = 'Paciente mantiene estado estable. Sin cambios significativos en condición general. Continúa con tratamiento habitual.';
-          break;
-        case 'medicacion':
-          contenido = 'Administración de medicamentos según prescripción médica. Paciente tolera bien el tratamiento.';
-          administracionMedicamentos = JSON.stringify({
-            medicamentos: ['Paracetamol', 'Enalapril'],
-            horario: '08:00',
-            observacion: 'Sin efectos adversos'
-          });
-          break;
-        case 'signos_vitales':
-          contenido = 'Toma de signos vitales rutinaria. Valores dentro de rangos normales.';
-          signosVitales = JSON.stringify({
-            presion_arterial: `${120 + Math.floor(Math.random() * 20)}/${70 + Math.floor(Math.random() * 15)}`,
-            frecuencia_cardiaca: `${70 + Math.floor(Math.random() * 20)}`,
-            temperatura: `${36 + Math.random() * 1.5}`,
-            saturacion_oxigeno: `${95 + Math.floor(Math.random() * 4)}%`
-          });
-          break;
-        case 'observacion':
-          contenido = 'Observación general del paciente. Apetito normal, sueño adecuado. Actividad física moderada.';
-          break;
-      }
-
-      notas.push({
-        paciente_id: pacienteId,
-        usuario_id: usuarioId,
-        tipo_nota: tipoNota,
-        contenido: contenido,
-        signos_vitales: signosVitales,
-        administracion_medicamentos: administracionMedicamentos,
-        observaciones: '',
-        estado_paciente: estado
-      });
-    }
-  }
-
-  for (const nota of notas) {
-    await client.query(
-      `INSERT INTO notas_enfermeria 
-       (paciente_id, usuario_id, tipo_nota, contenido, signos_vitales,
-        administracion_medicamentos, observaciones, estado_paciente, fecha_registro)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW() - INTERVAL '${Math.floor(Math.random() * 30)} days')`,
-      [
-        nota.paciente_id, nota.usuario_id, nota.tipo_nota, nota.contenido,
-        nota.signos_vitales, nota.administracion_medicamentos,
-        nota.observaciones, nota.estado_paciente
-      ]
-    );
-  }
-
-  console.log(`✅ ${notas.length} notas de enfermería de prueba creadas`);
 }
 
 // Ejecutar si se llama directamente

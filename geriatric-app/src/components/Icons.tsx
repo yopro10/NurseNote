@@ -195,3 +195,28 @@ export function TrazoECG({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export const IconoCampana = (p: IconProps) => (
+  <Base {...p}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" /></Base>
+);
+export const IconoDescargar = (p: IconProps) => (
+  <Base {...p}><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Base>
+);
+export const IconoMas = (p: IconProps) => (
+  <Base {...p}><path d="M12 5v14M5 12h14" /></Base>
+);
+export const IconoEditar = (p: IconProps) => (
+  <Base {...p}><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="m13.5 6.5 4 4" /></Base>
+);
+export const IconoTurno = (p: IconProps) => (
+  <Base {...p}><path d="M7 7h12l-3-3" /><path d="M17 17H5l3 3" /><path d="M19 7v4M5 17v-4" /></Base>
+);
+export const IconoUsuarios = (p: IconProps) => (
+  <Base {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5" /></Base>
+);
+export const IconoMenu = (p: IconProps) => (
+  <Base {...p}><path d="M4 7h16M4 12h16M4 17h16" /></Base>
+);
+export const IconoOjo = (p: IconProps) => (
+  <Base {...p}><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Base>
+);

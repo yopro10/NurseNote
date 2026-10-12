@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import pkg from 'pg';
 const { Client } = pkg;
 
@@ -6,7 +7,7 @@ async function resetDatabase() {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'yopro1015',
+    password: process.env.DB_PASSWORD || '',
     database: 'postgres'
   });
 

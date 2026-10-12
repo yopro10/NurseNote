@@ -1,120 +1,39 @@
-import { UserModel } from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { UserModel } from '../models/userModel.js';
+import { env } from '../config/env.js';
+import { HttpError, asyncHandler, bad } from '../utils/http.js';
+import { auditar } from '../middleware/auditMiddleware.js';
 
-export class AuthController {
-  static async register(req, res) {
-    try {
-      const { nombre, email, password, rol } = req.body;
+const publico = (u) => ({ id: u.id, nombre: u.nombre, apellido: u.apellido, email: u.email, rol: u.rol, fecha_creacion: u.fecha_creacion });
 
-      // Validaciones básicas
-      if (!nombre || !email || !password) {
-        return res.status(400).json({ error: 'Todos los campos son requeridos' });
-      }
+export const AuthController = {
+  /** El registro público está cerrado: las cuentas las crea un administrador desde Usuarios. */
+  register: (_req, _res, next) =>
+    next(new HttpError(403, 'El registro público está deshabilitado. Solicita tu cuenta a un administrador.')),
 
-      // Verificar si el usuario ya existe
-      const existingUser = await UserModel.findByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ error: 'El email ya está registrado' });
-      }
+  login: asyncHandler(async (req, res) => {
+    const { email, password } = req.body || {};
+    if (!email || !password) throw bad('Correo y contraseña son requeridos');
 
-      // Encriptar contraseña
-      const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await UserModel.findByEmail(String(email).trim());
+    const valido = user && (await bcrypt.compare(String(password), user.password));
+    if (!valido) throw new HttpError(401, 'Credenciales inválidas');
+    if (!user.activo) throw new HttpError(403, 'Tu cuenta está desactivada. Contacta a un administrador.');
 
-      // Crear usuario
-      const newUser = await UserModel.create({
-        nombre,
-        email,
-        password: hashedPassword,
-        rol: rol || 'enfermera'
-      });
+    const token = jwt.sign({ id: user.id, rol: user.rol }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+    await auditar({ user: { id: user.id }, ip: req.ip, get: req.get.bind(req) }, { accion: 'login', tabla: 'usuarios', registroId: user.id });
+    res.json({ message: 'Login exitoso', user: publico(user), token });
+  }),
 
-      // Generar token
-      const token = jwt.sign(
-        { id: newUser.id, email: newUser.email, rol: newUser.rol },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
+  getProfile: asyncHandler(async (req, res) => {
+    const user = await UserModel.findById(req.user.id);
+    if (!user) throw new HttpError(404, 'Usuario no encontrado');
+    res.json(publico(user));
+  }),
 
-      res.status(201).json({
-        message: 'Usuario registrado exitosamente',
-        user: {
-          id: newUser.id,
-          nombre: newUser.nombre,
-          email: newUser.email,
-          rol: newUser.rol
-        },
-        token
-      });
-    } catch (error) {
-      console.error('Error en registro:', error);
-      res.status(500).json({ error: 'Error al registrar usuario' });
-    }
-  }
-
-  static async login(req, res) {
-    try {
-      const { email, password } = req.body;
-
-      // Validaciones básicas
-      if (!email || !password) {
-        return res.status(400).json({ error: 'Email y contraseña son requeridos' });
-      }
-
-      // Buscar usuario
-      const user = await UserModel.findByEmail(email);
-      if (!user) {
-        return res.status(401).json({ error: 'Credenciales inválidas' });
-      }
-
-      // Verificar contraseña
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ error: 'Credenciales inválidas' });
-      }
-
-      // Generar token
-      const token = jwt.sign(
-        { id: user.id, email: user.email, rol: user.rol },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
-
-      res.json({
-        message: 'Login exitoso',
-        user: {
-          id: user.id,
-          nombre: user.nombre,
-          email: user.email,
-          rol: user.rol
-        },
-        token
-      });
-    } catch (error) {
-      console.error('Error en login:', error);
-      res.status(500).json({ error: 'Error al iniciar sesión' });
-    }
-  }
-
-  static async getProfile(req, res) {
-    try {
-      const userId = req.user.id;
-      const user = await UserModel.findById(userId);
-
-      if (!user) {
-        return res.status(404).json({ error: 'Usuario no encontrado' });
-      }
-
-      res.json({
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-        fecha_creacion: user.fecha_creacion
-      });
-    } catch (error) {
-      console.error('Error al obtener perfil:', error);
-      res.status(500).json({ error: 'Error al obtener perfil' });
-    }
-  }
-}
+  logout: asyncHandler(async (req, res) => {
+    await auditar(req, { accion: 'logout', tabla: 'usuarios', registroId: req.user.id });
+    res.json({ message: 'Sesión cerrada' });
+  }),
+};

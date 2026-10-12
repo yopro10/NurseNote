@@ -1,77 +1,58 @@
 import pool from '../config/database.js';
 
+const CAMPOS = 'id, nombre, apellido, email, rol, activo, fecha_creacion';
+
 export class UserModel {
-  static async create({ nombre, email, password, rol }) {
-    const query = `
-      INSERT INTO usuarios (nombre, email, password, rol, fecha_creacion)
-      VALUES ($1, $2, $3, $4, NOW())
-      RETURNING id, nombre, email, rol, fecha_creacion
-    `;
-    const values = [nombre, email, password, rol];
-    const result = await pool.query(query, values);
-    return result.rows[0];
+  static async create({ nombre, apellido, email, password, rol }) {
+    const { rows } = await pool.query(
+      `INSERT INTO usuarios (nombre, apellido, email, password, rol) VALUES ($1, $2, LOWER($3), $4, $5) RETURNING ${CAMPOS}`,
+      [nombre, apellido || null, email, password, rol]
+    );
+    return rows[0];
   }
-
   static async findByEmail(email) {
-    const query = 'SELECT * FROM usuarios WHERE email = $1';
-    const result = await pool.query(query, [email]);
-    return result.rows[0];
+    const { rows } = await pool.query('SELECT * FROM usuarios WHERE LOWER(email) = LOWER($1)', [email]);
+    return rows[0];
   }
-
   static async findById(id) {
-    const query = 'SELECT id, nombre, email, rol, fecha_creacion FROM usuarios WHERE id = $1';
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
+    const { rows } = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id = $1`, [id]);
+    return rows[0];
   }
-
-  static async getAll() {
-    const query = 'SELECT id, nombre, email, rol, fecha_creacion FROM usuarios ORDER BY nombre';
-    const result = await pool.query(query);
-    return result.rows;
+  static async getAll({ q, rol, activo } = {}) {
+    const w = [];
+    const v = [];
+    if (q) { v.push(`%${q}%`); w.push(`(nombre ILIKE $${v.length} OR apellido ILIKE $${v.length} OR email ILIKE $${v.length})`); }
+    if (rol) { v.push(rol); w.push(`rol = $${v.length}`); }
+    if (activo === 'true' || activo === 'false') { v.push(activo === 'true'); w.push(`activo = $${v.length}`); }
+    const { rows } = await pool.query(
+      `SELECT ${CAMPOS} FROM usuarios ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY activo DESC, nombre, apellido`, v);
+    return rows;
   }
-
-  static async update(id, { nombre, email, rol }) {
-    const query = `
-      UPDATE usuarios
-      SET nombre = $1, email = $2, rol = $3
-      WHERE id = $4
-      RETURNING id, nombre, email, rol, fecha_creacion
-    `;
-    const values = [nombre, email, rol, id];
-    const result = await pool.query(query, values);
-    return result.rows[0];
+  static async directorio() {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, apellido, rol FROM usuarios WHERE activo = true ORDER BY nombre, apellido`);
+    return rows;
   }
-
-  static async delete(id) {
-    const query = `
-      UPDATE usuarios
-      SET activo = false, fecha_actualizacion = NOW()
-      WHERE id = $1
-      RETURNING id, nombre, apellido, email, rol, activo
-    `;
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
+  static async update(id, { nombre, apellido, email, rol }) {
+    const { rows } = await pool.query(
+      `UPDATE usuarios SET nombre = COALESCE($1, nombre), apellido = COALESCE($2, apellido), email = COALESCE(LOWER($3), email),
+         rol = COALESCE($4, rol), fecha_actualizacion = NOW() WHERE id = $5 RETURNING ${CAMPOS}`,
+      [nombre ?? null, apellido ?? null, email ?? null, rol ?? null, id]
+    );
+    return rows[0];
   }
-
-  static async reactivate(id) {
-    const query = `
-      UPDATE usuarios
-      SET activo = true, fecha_actualizacion = NOW()
-      WHERE id = $1
-      RETURNING id, nombre, apellido, email, rol, activo
-    `;
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
+  static async setActivo(id, activo) {
+    const { rows } = await pool.query(
+      `UPDATE usuarios SET activo = $2, fecha_actualizacion = NOW() WHERE id = $1 RETURNING ${CAMPOS}`, [id, activo]);
+    return rows[0];
   }
-
-  static async resetPassword(id, newPassword) {
-    const query = `
-      UPDATE usuarios
-      SET password = $1, fecha_actualizacion = NOW()
-      WHERE id = $2
-      RETURNING id, nombre, apellido, email, rol
-    `;
-    const result = await pool.query(query, [newPassword, id]);
-    return result.rows[0];
+  static async setPassword(id, hash) {
+    const { rows } = await pool.query(
+      `UPDATE usuarios SET password = $2, fecha_actualizacion = NOW() WHERE id = $1 RETURNING ${CAMPOS}`, [id, hash]);
+    return rows[0];
+  }
+  static async contarAdminsActivos() {
+    const { rows } = await pool.query(`SELECT COUNT(*) AS n FROM usuarios WHERE rol = 'administrador' AND activo = true`);
+    return rows[0].n;
   }
 }

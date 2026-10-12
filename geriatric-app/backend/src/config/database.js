@@ -1,24 +1,33 @@
 import pkg from 'pg';
-const { Pool } = pkg;
+import { env } from './env.js';
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'geriatric_app',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'yopro1015',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+const { Pool, types } = pkg;
 
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
-});
+// Fechas sin zona horaria: se devuelven como hora local "YYYY-MM-DDTHH:mm:ss.SSS" (sin "Z")
+// para que navegador y servidor interpreten siempre la misma hora de pared.
+types.setTypeParser(1114, (v) => (v ? v.replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1') : v));
+types.setTypeParser(1082, (v) => v); // DATE → "YYYY-MM-DD"
+types.setTypeParser(20, (v) => parseInt(v, 10)); // COUNT(*) / BIGINT
+types.setTypeParser(1700, (v) => parseFloat(v)); // NUMERIC
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
+const pool = new Pool({ ...env.db, max: 20, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+
+pool.on('error', (err) => console.error('Error inesperado en el pool de PostgreSQL:', err.message));
+
+/** Ejecuta `fn(client)` dentro de una transacción. */
+export async function conTransaccion(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const resultado = await fn(client);
+    await client.query('COMMIT');
+    return resultado;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 export default pool;

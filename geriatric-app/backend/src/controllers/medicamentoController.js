@@ -1,293 +1,76 @@
-import { MedicamentoModel } from '../models/medicamentoModel.js';
-import { MedicamentoPacienteModel } from '../models/medicamentoPacienteModel.js';
+import { MedicamentoModel as M } from '../models/medicamentoModel.js';
+import { asyncHandler, bad, conflict, notFound, texto, vacio, esFechaISO } from '../utils/http.js';
+import { auditar } from '../middleware/auditMiddleware.js';
 
-export class MedicamentoController {
-  static async create(req, res) {
-    try {
-      const datos = req.body;
-      const nuevoMedicamento = await MedicamentoModel.create(datos);
-
-      res.status(201).json({
-        message: 'Medicamento registrado exitosamente',
-        medicamento: nuevoMedicamento
-      });
-    } catch (error) {
-      console.error('Error al crear medicamento:', error);
-      res.status(500).json({ error: 'Error al crear medicamento' });
-    }
+function normalizar(d, { crear }) {
+  const o = {};
+  for (const k of ['nombre', 'descripcion', 'presentacion', 'dosis', 'via_administracion', 'lote', 'proveedor']) {
+    if (d[k] !== undefined) o[k] = vacio(d[k]) ? null : texto(d[k]);
   }
-
-  static async getAll(req, res) {
-    try {
-      const filtros = req.query;
-      const medicamentos = await MedicamentoModel.getAll(filtros);
-
-      res.json(medicamentos);
-    } catch (error) {
-      console.error('Error al obtener medicamentos:', error);
-      res.status(500).json({ error: 'Error al obtener medicamentos' });
-    }
+  if (crear || o.nombre !== undefined) if (!o.nombre || o.nombre.length < 2) throw bad('El nombre del medicamento es obligatorio');
+  if (o.nombre && o.nombre.length > 200) throw bad('El nombre excede 200 caracteres');
+  if (crear || d.fecha_caducidad !== undefined) {
+    if (!esFechaISO(d.fecha_caducidad)) throw bad('La fecha de caducidad es obligatoria y debe ser válida');
+    o.fecha_caducidad = d.fecha_caducidad.slice(0, 10);
   }
-
-  static async getById(req, res) {
-    try {
-      const { id } = req.params;
-      const medicamento = await MedicamentoModel.findById(id);
-
-      if (!medicamento) {
-        return res.status(404).json({ error: 'Medicamento no encontrado' });
-      }
-
-      res.json(medicamento);
-    } catch (error) {
-      console.error('Error al obtener medicamento:', error);
-      res.status(500).json({ error: 'Error al obtener medicamento' });
-    }
+  if (d.cantidad_disponible !== undefined) {
+    const n = Number(d.cantidad_disponible);
+    if (!Number.isInteger(n) || n < 0) throw bad('La cantidad debe ser un entero mayor o igual a 0');
+    o.cantidad_disponible = n;
   }
-
-  static async update(req, res) {
-    try {
-      const { id } = req.params;
-      const datos = req.body;
-
-      const medicamentoActualizado = await MedicamentoModel.update(id, datos);
-
-      if (!medicamentoActualizado) {
-        return res.status(404).json({ error: 'Medicamento no encontrado' });
-      }
-
-      res.json({
-        message: 'Medicamento actualizado exitosamente',
-        medicamento: medicamentoActualizado
-      });
-    } catch (error) {
-      console.error('Error al actualizar medicamento:', error);
-      res.status(500).json({ error: 'Error al actualizar medicamento' });
-    }
+  if (d.stock_minimo !== undefined && !vacio(d.stock_minimo)) {
+    const n = Number(d.stock_minimo);
+    if (!Number.isInteger(n) || n < 0) throw bad('El stock mínimo debe ser un entero mayor o igual a 0');
+    o.stock_minimo = n;
   }
-
-  static async delete(req, res) {
-    try {
-      const { id } = req.params;
-
-      const medicamentoEliminado = await MedicamentoModel.delete(id);
-
-      if (!medicamentoEliminado) {
-        return res.status(404).json({ error: 'Medicamento no encontrado' });
-      }
-
-      res.json({
-        message: 'Medicamento eliminado exitosamente',
-        medicamento: medicamentoEliminado
-      });
-    } catch (error) {
-      console.error('Error al eliminar medicamento:', error);
-      res.status(500).json({ error: 'Error al eliminar medicamento' });
-    }
-  }
-
-  static async actualizarCantidad(req, res) {
-    try {
-      const { id } = req.params;
-      const { cantidad } = req.body;
-
-      if (cantidad === undefined || cantidad === null) {
-        return res.status(400).json({ error: 'Cantidad es requerida' });
-      }
-
-      const medicamentoActualizado = await MedicamentoModel.actualizarCantidad(id, cantidad);
-
-      if (!medicamentoActualizado) {
-        return res.status(404).json({ error: 'Medicamento no encontrado' });
-      }
-
-      res.json({
-        message: 'Cantidad actualizada exitosamente',
-        medicamento: medicamentoActualizado
-      });
-    } catch (error) {
-      console.error('Error al actualizar cantidad:', error);
-      res.status(500).json({ error: 'Error al actualizar cantidad' });
-    }
-  }
-
-  static async ajustarStock(req, res) {
-    try {
-      const { id } = req.params;
-      const { cantidad, motivo } = req.body;
-
-      if (cantidad === undefined || cantidad === null) {
-        return res.status(400).json({ error: 'Cantidad es requerida' });
-      }
-
-      if (!motivo) {
-        return res.status(400).json({ error: 'Motivo del ajuste es requerido' });
-      }
-
-      const medicamentoActualizado = await MedicamentoModel.ajustarStock(id, cantidad, motivo);
-
-      if (!medicamentoActualizado) {
-        return res.status(404).json({ error: 'Medicamento no encontrado' });
-      }
-
-      res.json({
-        message: 'Stock ajustado exitosamente',
-        medicamento: medicamentoActualizado
-      });
-    } catch (error) {
-      console.error('Error al ajustar stock:', error);
-      res.status(500).json({ error: 'Error al ajustar stock' });
-    }
-  }
-
-  static async getAlertas(req, res) {
-    try {
-      const alertas = await MedicamentoModel.getAlertas();
-
-      res.json({
-        message: 'Alertas de medicamentos',
-        alertas,
-        total: alertas.length
-      });
-    } catch (error) {
-      console.error('Error al obtener alertas:', error);
-      res.status(500).json({ error: 'Error al obtener alertas' });
-    }
-  }
-
-  static async getProximosVencer(req, res) {
-    try {
-      const dias = parseInt(req.query.dias) || 30;
-      const medicamentos = await MedicamentoModel.getMedicamentosProximosVencer(dias);
-
-      res.json({
-        message: `Medicamentos próximos a vencer en los próximos ${dias} días`,
-        medicamentos,
-        total: medicamentos.length
-      });
-    } catch (error) {
-      console.error('Error al obtener medicamentos próximos a vencer:', error);
-      res.status(500).json({ error: 'Error al obtener medicamentos próximos a vencer' });
-    }
-  }
-
-  static async getVencidos(req, res) {
-    try {
-      const medicamentos = await MedicamentoModel.getMedicamentosVencidos();
-
-      res.json({
-        message: 'Medicamentos vencidos',
-        medicamentos,
-        total: medicamentos.length
-      });
-    } catch (error) {
-      console.error('Error al obtener medicamentos vencidos:', error);
-      res.status(500).json({ error: 'Error al obtener medicamentos vencidos' });
-    }
-  }
-
-  static async getBajoStock(req, res) {
-    try {
-      const minimo = parseInt(req.query.minimo) || 10;
-      const medicamentos = await MedicamentoModel.getMedicamentosBajoStock(minimo);
-
-      res.json({
-        message: `Medicamentos con stock bajo (menos de ${minimo} unidades)`,
-        medicamentos,
-        total: medicamentos.length
-      });
-    } catch (error) {
-      console.error('Error al obtener medicamentos bajo stock:', error);
-      res.status(500).json({ error: 'Error al obtener medicamentos bajo stock' });
-    }
-  }
-
-  // Métodos para medicamentos asignados a pacientes
-  static async asignarAPaciente(req, res) {
-    try {
-      const datos = req.body;
-      const nuevaAsignacion = await MedicamentoPacienteModel.create(datos);
-
-      res.status(201).json({
-        message: 'Medicamento asignado al paciente exitosamente',
-        asignacion: nuevaAsignacion
-      });
-    } catch (error) {
-      console.error('Error al asignar medicamento:', error);
-      res.status(500).json({ error: 'Error al asignar medicamento al paciente' });
-    }
-  }
-
-  static async getMedicamentosPaciente(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const medicamentos = await MedicamentoPacienteModel.getMedicamentosActivosPorPaciente(pacienteId);
-
-      res.json({
-        message: 'Medicamentos activos del paciente',
-        medicamentos,
-        total: medicamentos.length
-      });
-    } catch (error) {
-      console.error('Error al obtener medicamentos del paciente:', error);
-      res.status(500).json({ error: 'Error al obtener medicamentos del paciente' });
-    }
-  }
-
-  static async getPacientesMedicamento(req, res) {
-    try {
-      const { medicamentoId } = req.params;
-      const pacientes = await MedicamentoPacienteModel.getByMedicamento(medicamentoId);
-
-      res.json({
-        message: 'Pacientes que tienen asignado este medicamento',
-        pacientes,
-        total: pacientes.length
-      });
-    } catch (error) {
-      console.error('Error al obtener pacientes del medicamento:', error);
-      res.status(500).json({ error: 'Error al obtener pacientes del medicamento' });
-    }
-  }
-
-  static async actualizarAsignacion(req, res) {
-    try {
-      const { id } = req.params;
-      const datos = req.body;
-
-      const asignacionActualizada = await MedicamentoPacienteModel.update(id, datos);
-
-      if (!asignacionActualizada) {
-        return res.status(404).json({ error: 'Asignación no encontrada' });
-      }
-
-      res.json({
-        message: 'Asignación actualizada exitosamente',
-        asignacion: asignacionActualizada
-      });
-    } catch (error) {
-      console.error('Error al actualizar asignación:', error);
-      res.status(500).json({ error: 'Error al actualizar asignación' });
-    }
-  }
-
-  static async eliminarAsignacion(req, res) {
-    try {
-      const { id } = req.params;
-
-      const asignacionEliminada = await MedicamentoPacienteModel.delete(id);
-
-      if (!asignacionEliminada) {
-        return res.status(404).json({ error: 'Asignación no encontrada' });
-      }
-
-      res.json({
-        message: 'Asignación eliminada exitosamente',
-        asignacion: asignacionEliminada
-      });
-    } catch (error) {
-      console.error('Error al eliminar asignación:', error);
-      res.status(500).json({ error: 'Error al eliminar asignación' });
-    }
-  }
+  return o;
 }
+
+export const MedicamentoController = {
+  getAll: asyncHandler(async (req, res) => res.json(await M.getAll(req.query))),
+
+  getById: asyncHandler(async (req, res) => {
+    const m = await M.findById(req.params.id);
+    if (!m) throw notFound('Medicamento no encontrado');
+    res.json({ ...m, residentes: await M.residentes(m.id), movimientos: await M.movimientos(m.id, 30) });
+  }),
+
+  create: asyncHandler(async (req, res) => {
+    const d = normalizar(req.body || {}, { crear: true });
+    const m = await M.create(d, req.user.id);
+    await auditar(req, { accion: 'crear', tabla: 'medicamentos', registroId: m.id, despues: d });
+    res.status(201).json(m);
+  }),
+
+  update: asyncHandler(async (req, res) => {
+    const antes = await M.findById(req.params.id);
+    if (!antes) throw notFound('Medicamento no encontrado');
+    const d = normalizar(req.body || {}, { crear: false });
+    delete d.cantidad_disponible; // el stock solo cambia mediante movimientos (queda trazabilidad)
+    const m = await M.update(antes.id, d);
+    await auditar(req, { accion: 'actualizar', tabla: 'medicamentos', registroId: antes.id, antes, despues: d });
+    res.json(m);
+  }),
+
+  moverStock: asyncHandler(async (req, res) => {
+    const { tipo, motivo } = req.body || {};
+    const cantidad = Number(req.body?.cantidad);
+    if (!['entrada', 'salida', 'ajuste'].includes(tipo)) throw bad('Tipo de movimiento inválido');
+    if (!Number.isInteger(cantidad) || cantidad < (tipo === 'ajuste' ? 0 : 1)) throw bad('La cantidad debe ser un entero válido');
+    if ((tipo === 'salida' || tipo === 'ajuste') && (vacio(motivo) || motivo.trim().length < 3)) throw bad('Indica el motivo del movimiento');
+    const r = await M.moverStock(Number(req.params.id), { tipo, cantidad, motivo: texto(motivo) }, req.user.id);
+    if (r.error === 'No encontrado') throw notFound('Medicamento no encontrado');
+    if (r.error) throw conflict(r.error);
+    await auditar(req, { accion: 'ajustar_stock', tabla: 'medicamentos', registroId: Number(req.params.id), antes: { stock: r.anterior }, despues: { stock: r.nuevo, tipo, motivo } });
+    res.json({ message: 'Stock actualizado', ...r });
+  }),
+
+  delete: asyncHandler(async (req, res) => {
+    const m = await M.findById(req.params.id);
+    if (!m) throw notFound('Medicamento no encontrado');
+    if (m.residentes_asignados > 0) throw conflict(`No se puede retirar: ${m.residentes_asignados} residente(s) lo tienen prescrito. Suspende primero esas prescripciones.`);
+    await M.desactivar(m.id);
+    await auditar(req, { accion: 'desactivar', tabla: 'medicamentos', registroId: m.id, antes: m });
+    res.json({ message: 'Medicamento retirado del inventario' });
+  }),
+};

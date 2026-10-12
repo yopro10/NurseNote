@@ -1,31 +1,19 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-interface AccesibilidadContextType {
-  tamanoLetra: 'normal' | 'grande' | 'muy-grande';
-  cambiarTamanoLetra: (tamano: 'normal' | 'grande' | 'muy-grande') => void;
-}
-
-const AccesibilidadContext = createContext<AccesibilidadContextType | undefined>(undefined);
+export type Tamano = 'normal' | 'grande' | 'muy-grande';
+const Ctx = createContext<{ tamanoLetra: Tamano; cambiarTamanoLetra: (t: Tamano) => void } | undefined>(undefined);
 
 export function AccesibilidadProvider({ children }: { children: ReactNode }) {
-  const [tamanoLetra, setTamanoLetra] = useState<'normal' | 'grande' | 'muy-grande'>('normal');
-
-  const cambiarTamanoLetra = (tamano: 'normal' | 'grande' | 'muy-grande') => {
-    setTamanoLetra(tamano);
-    document.documentElement.setAttribute('data-tamano-letra', tamano);
-  };
-
-  return (
-    <AccesibilidadContext.Provider value={{ tamanoLetra, cambiarTamanoLetra }}>
-      {children}
-    </AccesibilidadContext.Provider>
-  );
+  const [tamanoLetra, setTamano] = useState<Tamano>(() => (localStorage.getItem('tamano_letra') as Tamano) || 'normal');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-tamano-letra', tamanoLetra);
+    localStorage.setItem('tamano_letra', tamanoLetra);
+  }, [tamanoLetra]);
+  return <Ctx.Provider value={{ tamanoLetra, cambiarTamanoLetra: setTamano }}>{children}</Ctx.Provider>;
 }
 
 export function useAccesibilidad() {
-  const context = useContext(AccesibilidadContext);
-  if (!context) {
-    throw new Error('useAccesibilidad debe usarse dentro de AccesibilidadProvider');
-  }
-  return context;
+  const c = useContext(Ctx);
+  if (!c) throw new Error('useAccesibilidad debe usarse dentro de AccesibilidadProvider');
+  return c;
 }

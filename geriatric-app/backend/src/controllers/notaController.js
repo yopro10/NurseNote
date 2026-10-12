@@ -1,150 +1,74 @@
 import { NotaModel } from '../models/notaModel.js';
+import pool from '../config/database.js';
+import { asyncHandler, bad, forbidden, notFound, paginar, texto, vacio } from '../utils/http.js';
+import { auditar } from '../middleware/auditMiddleware.js';
+import { esGestorRol } from '../middleware/authMiddleware.js';
 
-export class NotaController {
-  static async create(req, res) {
-    try {
-      const datos = {
-        ...req.body,
-        usuario_id: req.user.id // Agregar el ID del usuario autenticado
-      };
+export const TIPOS = ['ingreso', 'evolucion', 'egreso', 'medicacion', 'signos_vitales', 'observacion', 'correccion'];
+const VENTANA_EDICION_H = 24;
 
-      const nuevaNota = await NotaModel.create(datos);
+const puedeEditar = (nota, user) =>
+  esGestorRol(user.rol) || (nota.usuario_id === user.id && Date.now() - Date.parse(nota.fecha_registro) < VENTANA_EDICION_H * 3600 * 1000);
 
-      res.status(201).json({
-        message: 'Nota de enfermería creada exitosamente',
-        nota: nuevaNota
-      });
-    } catch (error) {
-      console.error('Error al crear nota:', error);
-      res.status(500).json({ error: 'Error al crear nota de enfermería' });
-    }
-  }
+export const NotaController = {
+  listar: asyncHandler(async (req, res) => {
+    const f = { ...req.query };
+    if (f.mias === 'true') f.usuario_id = req.user.id;
+    const pag = paginar(req.query, 15);
+    const { data, total } = await NotaModel.listar(f, pag);
+    res.json({ data, total, page: pag.page, limit: pag.limit, paginas: Math.max(1, Math.ceil(total / pag.limit)) });
+  }),
 
-  static async getAll(req, res) {
-    try {
-      const filtros = req.query;
-      
-      // Si no es administrador, solo puede ver sus propias notas
-      if (req.user.rol !== 'administrador' && req.user.rol !== 'jefe_enfermeria') {
-        filtros.usuario_id = req.user.id;
-      }
+  getById: asyncHandler(async (req, res) => {
+    const nota = await NotaModel.findById(req.params.id);
+    if (!nota) throw notFound('Nota no encontrada');
+    res.json({ ...nota, editable: !nota.anulada && puedeEditar(nota, req.user) });
+  }),
 
-      const notas = await NotaModel.getAll(filtros);
+  create: asyncHandler(async (req, res) => {
+    const d = req.body || {};
+    if (!TIPOS.includes(d.tipo_nota)) throw bad('Tipo de nota inválido');
+    if (!Number.isInteger(Number(d.paciente_id))) throw bad('Selecciona un residente');
+    if (vacio(d.contenido) || d.contenido.trim().length < 3) throw bad('El contenido de la nota es obligatorio (mínimo 3 caracteres)');
+    if (d.contenido.length > 5000) throw bad('El contenido excede 5000 caracteres');
+    const { rows } = await pool.query('SELECT id, activo, estado_calculado FROM pacientes WHERE id = $1', [d.paciente_id]);
+    if (!rows[0]) throw notFound('Residente no encontrado');
+    if (!rows[0].activo) throw bad('No se pueden registrar notas de un residente egresado');
 
-      res.json(notas);
-    } catch (error) {
-      console.error('Error al obtener notas:', error);
-      res.status(500).json({ error: 'Error al obtener notas de enfermería' });
-    }
-  }
+    const nota = await NotaModel.create({
+      paciente_id: rows[0].id, usuario_id: req.user.id, tipo_nota: d.tipo_nota, contenido: texto(d.contenido),
+      observaciones: vacio(d.observaciones) ? null : texto(d.observaciones),
+      signos_vitales: d.signos_vitales && typeof d.signos_vitales === 'object' ? d.signos_vitales : null,
+      administracion_medicamentos: d.administracion_medicamentos && typeof d.administracion_medicamentos === 'object' ? d.administracion_medicamentos : null,
+      estado_paciente: rows[0].estado_calculado,
+    });
+    await auditar(req, { accion: 'crear', tabla: 'notas_enfermeria', registroId: nota.id, despues: { paciente_id: nota.paciente_id, tipo_nota: nota.tipo_nota } });
+    res.status(201).json({ message: 'Nota registrada', nota });
+  }),
 
-  static async getById(req, res) {
-    try {
-      const { id } = req.params;
-      const nota = await NotaModel.findById(id);
+  update: asyncHandler(async (req, res) => {
+    const antes = await NotaModel.findById(req.params.id);
+    if (!antes) throw notFound('Nota no encontrada');
+    if (antes.anulada) throw bad('La nota está anulada y no puede editarse');
+    if (!puedeEditar(antes, req.user)) throw forbidden(`Solo el autor puede editar su nota durante las primeras ${VENTANA_EDICION_H} h (o un jefe/administrador).`);
+    const d = req.body || {};
+    if (d.tipo_nota !== undefined && !TIPOS.includes(d.tipo_nota)) throw bad('Tipo de nota inválido');
+    if (d.contenido !== undefined && (vacio(d.contenido) || d.contenido.trim().length < 3)) throw bad('El contenido de la nota es obligatorio');
+    const nota = await NotaModel.update(antes.id, { contenido: texto(d.contenido), observaciones: texto(d.observaciones), tipo_nota: d.tipo_nota });
+    await auditar(req, { accion: 'actualizar', tabla: 'notas_enfermeria', registroId: antes.id, antes: { contenido: antes.contenido, observaciones: antes.observaciones, tipo_nota: antes.tipo_nota }, despues: d });
+    res.json({ message: 'Nota actualizada', nota });
+  }),
 
-      if (!nota) {
-        return res.status(404).json({ error: 'Nota no encontrada' });
-      }
-
-      // Verificar permisos
-      if (req.user.rol !== 'administrador' && 
-          req.user.rol !== 'jefe_enfermeria' && 
-          nota.usuario_id !== req.user.id) {
-        return res.status(403).json({ error: 'No tienes permiso para ver esta nota' });
-      }
-
-      res.json(nota);
-    } catch (error) {
-      console.error('Error al obtener nota:', error);
-      res.status(500).json({ error: 'Error al obtener nota de enfermería' });
-    }
-  }
-
-  static async getByPaciente(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const filtros = req.query;
-
-      const notas = await NotaModel.getByPaciente(pacienteId, filtros);
-
-      res.json(notas);
-    } catch (error) {
-      console.error('Error al obtener notas del paciente:', error);
-      res.status(500).json({ error: 'Error al obtener notas del paciente' });
-    }
-  }
-
-  static async getUltimasNotas(req, res) {
-    try {
-      const { pacienteId } = req.params;
-      const limite = parseInt(req.query.limite) || 10;
-
-      const notas = await NotaModel.getUltimasNotas(pacienteId, limite);
-
-      res.json(notas);
-    } catch (error) {
-      console.error('Error al obtener últimas notas:', error);
-      res.status(500).json({ error: 'Error al obtener últimas notas' });
-    }
-  }
-
-  static async update(req, res) {
-    try {
-      const { id } = req.params;
-      const datos = req.body;
-
-      // Verificar que la nota existe y pertenece al usuario
-      const notaExistente = await NotaModel.findById(id);
-      if (!notaExistente) {
-        return res.status(404).json({ error: 'Nota no encontrada' });
-      }
-
-      // Verificar permisos
-      if (req.user.rol !== 'administrador' && 
-          req.user.rol !== 'jefe_enfermeria' && 
-          notaExistente.usuario_id !== req.user.id) {
-        return res.status(403).json({ error: 'No tienes permiso para editar esta nota' });
-      }
-
-      const notaActualizada = await NotaModel.update(id, datos);
-
-      res.json({
-        message: 'Nota actualizada exitosamente',
-        nota: notaActualizada
-      });
-    } catch (error) {
-      console.error('Error al actualizar nota:', error);
-      res.status(500).json({ error: 'Error al actualizar nota de enfermería' });
-    }
-  }
-
-  static async delete(req, res) {
-    try {
-      const { id } = req.params;
-
-      // Verificar que la nota existe y pertenece al usuario
-      const notaExistente = await NotaModel.findById(id);
-      if (!notaExistente) {
-        return res.status(404).json({ error: 'Nota no encontrada' });
-      }
-
-      // Verificar permisos
-      if (req.user.rol !== 'administrador' && 
-          req.user.rol !== 'jefe_enfermeria' && 
-          notaExistente.usuario_id !== req.user.id) {
-        return res.status(403).json({ error: 'No tienes permiso para eliminar esta nota' });
-      }
-
-      const notaEliminada = await NotaModel.delete(id);
-
-      res.json({
-        message: 'Nota eliminada exitosamente',
-        nota: notaEliminada
-      });
-    } catch (error) {
-      console.error('Error al eliminar nota:', error);
-      res.status(500).json({ error: 'Error al eliminar nota de enfermería' });
-    }
-  }
-}
+  /** Las notas clínicas no se borran: se anulan con motivo y quedan visibles como "anuladas". */
+  anular: asyncHandler(async (req, res) => {
+    const antes = await NotaModel.findById(req.params.id);
+    if (!antes) throw notFound('Nota no encontrada');
+    if (antes.anulada) throw bad('La nota ya está anulada');
+    if (!puedeEditar(antes, req.user)) throw forbidden('No tienes permiso para anular esta nota');
+    const motivo = texto(req.body?.motivo);
+    if (vacio(motivo) || motivo.length < 5) throw bad('Indica el motivo de la anulación (mínimo 5 caracteres)');
+    const nota = await NotaModel.anular(antes.id, motivo, req.user.id);
+    await auditar(req, { accion: 'anular', tabla: 'notas_enfermeria', registroId: antes.id, despues: { motivo } });
+    res.json({ message: 'Nota anulada', nota });
+  }),
+};

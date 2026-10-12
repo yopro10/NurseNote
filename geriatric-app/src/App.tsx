@@ -1,105 +1,49 @@
-import { AppProvider, useApp } from './context/AppContext';
-import { NotificationProvider, useNotifications } from './context/NotificationContext';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
+import { useState } from 'react';
+import { useApp } from './context/AppContext';
+import { Header, Sidebar } from './components/Layout';
 import LoginView from './views/LoginView';
 import DashboardView from './views/DashboardView';
-import PatientListView from './views/PatientListView';
+import NotasView from './views/NotasView';
 import SignosVitalesView from './views/SignosVitalesView';
 import MedicamentosView from './views/MedicamentosView';
-import RegisterFormView from './views/RegisterFormView';
-import EstadisticasView from './views/EstadisticasView';
-import InventarioMedicamentosView from './views/InventarioMedicamentosView';
-import UsuariosView from './views/UsuariosView';
+import ResidentesView from './views/ResidentesView';
 import FichaResidenteView from './views/FichaResidenteView';
-import NotificationToast from './components/NotificationToast';
+import InventarioView from './views/InventarioView';
+import EstadisticasView from './views/EstadisticasView';
+import TurnosView from './views/TurnosView';
+import UsuariosView from './views/UsuariosView';
 
-/**
- * Enrutador principal de la SPA.
- * No se usa una librería de enrutamiento externa: el "router" es el
- * estado `vista` del AppContext, que decide qué vista renderizar dentro
- * del layout maestro sin recargar la página.
- */
-function EnrutadorPrincipal() {
-  const { vista, cargandoSesion, usuarioActual, moduloSeleccionado } = useApp();
-  const tema =
-    vista === 'registro'
-      ? ({ signos_vitales: 'signos', medicacion: 'medicamentos' } as Record<string, string>)[moduloSeleccionado ?? ''] ?? 'notas'
-      : ({
-          dashboard: 'inicio',
-          notas_enfermeria: 'notas',
-          signos_vitales: 'signos',
-          medicamentos: 'medicamentos',
-          gestion_pacientes: 'residentes',
-          inventario_medicamentos: 'inventario',
-          estadisticas: 'estadisticas',
-          usuarios: 'usuarios',
-          ficha_residente: 'residentes',
-        } as Record<string, string>)[vista] ?? 'inicio';
+const TEMA: Record<string, string> = { dashboard: 'notas', notas: 'notas', signos: 'signos', medicamentos: 'medicamentos', residentes: 'residentes', ficha: 'residentes', inventario: 'inventario', estadisticas: 'estadisticas', turnos: 'turnos', usuarios: 'usuarios' };
 
-  if (cargandoSesion) {
-    return (
-      <div className="pantalla-carga">
-        <div className="spinner" />
-        <p>Cargando sesión…</p>
-      </div>
-    );
-  }
+export default function App() {
+  const { cargandoSesion, usuario, destino, esGestor } = useApp();
+  const [menu, setMenu] = useState(false);
+  const [sinLeer, setSinLeer] = useState(0);
 
-  if (!usuarioActual) {
-    return <LoginView />;
-  }
+  if (cargandoSesion) return <div className="pantalla-carga"><div className="spinner" /><p>Cargando sesión…</p></div>;
+  if (!usuario) return <LoginView />;
 
+  const v = destino.vista;
   return (
-    <div className="layout-maestro" data-tema={tema}>
-      <Sidebar />
-      <div className="layout-maestro__contenido">
-        <Header />
-        <main className="layout-maestro__area-trabajo">
-          <div className="area-trabajo__interior">
-            {vista === 'dashboard' && <DashboardView />}
-            {vista === 'notas_enfermeria' && <PatientListView />}
-            {vista === 'signos_vitales' && <SignosVitalesView />}
-            {vista === 'medicamentos' && <MedicamentosView />}
-            {vista === 'gestion_pacientes' && <PatientListView />}
-            {vista === 'estadisticas' && <EstadisticasView />}
-            {vista === 'inventario_medicamentos' && <InventarioMedicamentosView />}
-            {vista === 'registro' && <RegisterFormView />}
-            {vista === 'usuarios' && <UsuariosView />}
-            {vista === 'ficha_residente' && <FichaResidenteView />}
+    <div className="app" data-tema={TEMA[v]}>
+      <Sidebar abierto={menu} onCerrar={() => setMenu(false)} sinLeer={sinLeer} />
+      <div className="app__main">
+        <Header onMenu={() => setMenu((m) => !m)} onNoLeidas={setSinLeer} />
+        <main className="app__contenido" onClick={() => menu && setMenu(false)}>
+          <div className="app__interior">
+            {v === 'dashboard' && <DashboardView />}
+            {v === 'notas' && <NotasView />}
+            {v === 'signos' && <SignosVitalesView />}
+            {v === 'medicamentos' && <MedicamentosView />}
+            {v === 'residentes' && <ResidentesView />}
+            {v === 'ficha' && <FichaResidenteView />}
+            {v === 'inventario' && <InventarioView />}
+            {v === 'estadisticas' && <EstadisticasView />}
+            {v === 'turnos' && <TurnosView />}
+            {v === 'usuarios' && (esGestor ? <UsuariosView /> : <div className="alerta alerta--error">No tienes permiso para ver esta sección.</div>)}
           </div>
         </main>
       </div>
     </div>
-  );
-}
-
-function AppWithNotifications() {
-  const { notifications, removeNotification } = useNotifications();
-
-  return (
-    <>
-      <EnrutadorPrincipal />
-      <div className="toasts" aria-live="polite">
-        {notifications.map((notification) => (
-          <NotificationToast
-            key={notification.id}
-            message={notification.message}
-            type={notification.type}
-            onClose={() => removeNotification(notification.id)}
-          />
-        ))}
-      </div>
-    </>
-  );
-}
-
-export default function App() {
-  return (
-    <AppProvider>
-      <NotificationProvider>
-        <AppWithNotifications />
-      </NotificationProvider>
-    </AppProvider>
   );
 }

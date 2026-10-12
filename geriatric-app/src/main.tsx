@@ -1,20 +1,21 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/plus-jakarta-sans';
-import './index.css';
-import './tema.css';
-import './accesibilidad.css';
+import './styles.css';
+import App from './App';
 import { AccesibilidadProvider } from './context/AccesibilidadContext';
-import { NotificationProvider } from './context/NotificationContext';
+import { ToastProvider } from './context/ToastContext';
+import { AppProvider } from './context/AppContext';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AccesibilidadProvider>
-      <NotificationProvider>
-        <App />
-      </NotificationProvider>
+      <ToastProvider>
+        <AppProvider>
+          <App />
+        </AppProvider>
+      </ToastProvider>
     </AccesibilidadProvider>
   </React.StrictMode>
 );
